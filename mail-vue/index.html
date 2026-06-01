@@ -23,10 +23,20 @@
 </head>
 <style>
   html {
-    background: #FFFFFF;
+    background: linear-gradient(-45deg, #ff9a9e, #fecfef, #ffb199, #ffc3a0);
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
   }
   .dark {
-    background: #141414;
+    background: linear-gradient(-45deg, #2b1029, #1b0f1c, #3d142d, #140b17);
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
+  }
+  
+  @keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
   }
   #loading-first {
     position: fixed;
@@ -38,7 +48,7 @@
     justify-content: center;
     align-items: center;
     z-index: 500;
-    background: var(--el-bg-color);
+    background: transparent;
   }
 
   .loading-hide {
@@ -66,7 +76,7 @@
     height: 4px;
     overflow: hidden;
     border-radius: 999px;
-    background: rgba(64, 158, 255, 0.18);
+    background: rgba(255, 121, 198, 0.18);
   }
 
   .loading-progress::before {
@@ -77,7 +87,7 @@
     width: 100%;
     height: 100%;
     border-radius: inherit;
-    background: #409EFF;
+    background: #ff79c6;
     transform: scaleX(0);
     transform-origin: left center;
     animation: loading-progress-grow 2.4s linear forwards;
@@ -90,7 +100,7 @@
     width: 24px;
     height: 100%;
     border-radius: inherit;
-    background: rgba(64, 158, 255, 0.45);
+    background: rgba(255, 121, 198, 0.45);
     filter: blur(4px);
     transform: translateX(-24px);
     animation: loading-progress-peg 2.4s linear forwards;

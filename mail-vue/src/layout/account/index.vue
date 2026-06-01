@@ -519,7 +519,7 @@ path[fill="#ffdda1"] {
 .account-box {
 
   border-right: 1px solid var(--el-border-color) !important;
-  background-color: var(--el-bg-color);
+  background-color: transparent !important;
   height: 100%;
   overflow: hidden;
 
@@ -578,13 +578,22 @@ path[fill="#ffdda1"] {
   }
 
   .item {
-    background-color: var(--el-bg-color);
-    border-radius: 8px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: 12px;
     padding: 12px 10px;
     margin-bottom: 10px;
     margin-left: 10px;
     margin-right: 10px;
     cursor: pointer;
+    transition: var(--spring-transition);
+  }
+  
+  .item:hover {
+    transform: translateY(-2px) scale(1.02);
+  }
 
     .account {
       font-weight: 600;
@@ -622,7 +631,9 @@ path[fill="#ffdda1"] {
   }
 
   .item-choose {
-    background: var(--choose-account-background);
+    background: rgba(255, 121, 198, 0.4) !important;
+    border-color: rgba(255, 121, 198, 0.8) !important;
+    box-shadow: 0 4px 15px rgba(255, 121, 198, 0.4) !important;
   }
 }
 

@@ -161,7 +161,7 @@ const handleResize = () => {
 
 
 .main-view {
-  background: var(--el-bg-color);
+  background: transparent !important;
 }
 
 

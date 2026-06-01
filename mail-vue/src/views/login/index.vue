@@ -605,28 +605,28 @@ function submitRegister() {
 
 .form-wrapper {
   position: fixed;
-  right: 0;
+  width: 100%;
   height: 100%;
   z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
-  @media (max-width: 767px) {
-    width: 100%;
-  }
 }
 
 .container {
-  background: v-bind(loginOpacity);
-  padding-left: 40px;
-  padding-right: 40px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  padding: 40px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   width: 450px;
-  height: 100%;
-  border-left: 1px solid var(--login-border);
-  box-shadow: var(--el-box-shadow-light);
+  height: auto;
+  min-height: 500px;
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  transition: var(--spring-transition);
   @media (max-width: 1024px) {
     padding: 20px 18px;
     width: 384px;
@@ -766,7 +766,7 @@ function submitRegister() {
 
 
 #login-box {
-  background: linear-gradient(to bottom, #2980b9, #6dd5fa, #fff);
+  background: transparent !important;
   font: 100% Arial, sans-serif;
   height: 100%;
   margin: 0;
@@ -778,8 +778,7 @@ function submitRegister() {
 
 
 #background-wrap {
-  height: 100%;
-  z-index: 0;
+  display: none;
 }
 
 @keyframes animateCloud {

@@ -158,6 +158,12 @@ button, input, select, textarea {
     --glass-bg: rgba(255, 255, 255, 0.25);
     --glass-border: rgba(255, 255, 255, 0.5);
     --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+    --spring-transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    
+    /* 覆盖 Element Plus 的白色色块 */
+    --el-bg-color: var(--glass-bg) !important;
+    --el-bg-color-overlay: var(--glass-bg) !important;
+    --el-fill-color-blank: transparent !important;
 }
 
 .dark {

@@ -44,4 +44,4 @@ crons = ["*/30 * * * *", "0 16 * * *"]	#每30分钟刷新分析缓存，每天�
 #jwt_secret = ""			#jwt令牌的密钥,随便填一串字符串
 
 [build]
-command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"
+command = "npm --prefix ../mail-vue install && npm --prefix ../mail-vue run build"
