@@ -589,11 +589,10 @@ path[fill="#ffdda1"] {
     margin-right: 10px;
     cursor: pointer;
     transition: var(--spring-transition);
-  }
   
-  .item:hover {
-    transform: translateY(-2px) scale(1.02);
-  }
+    &:hover {
+      transform: translateY(-2px) scale(1.02);
+    }
 
     .account {
       font-weight: 600;
