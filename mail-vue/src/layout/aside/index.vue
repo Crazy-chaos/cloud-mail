@@ -5,7 +5,7 @@
         <Icon icon="mdi:email-outline" width="24" height="24" />
         <div>{{settingStore.settings.title}}</div>
       </div>
-      <el-menu :collapse="false" text-color="#fff" active-text-color="#fff" style="margin-top: 10px">
+      <el-menu :collapse="false" style="margin-top: 10px">
         <el-menu-item @click="router.push({name: 'email'})" index="email"
                       :class="route.meta.name === 'email' ? 'choose-item' : ''">
           <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
@@ -125,7 +125,7 @@ const route = useRoute();
 .manage-title {
   margin-top: 10px;
   padding-left: 20px;
-  color: #fff;
+  color: var(--el-text-color-primary);
 }
 
 .el-menu-item {
@@ -140,7 +140,7 @@ const route = useRoute();
   font-weight: bold;
   background: rgba(255, 121, 198, 0.4) !important;
   backdrop-filter: blur(4px);
-  color: #fff;
+  color: var(--el-text-color-primary);
   box-shadow: 0 4px 15px rgba(255, 121, 198, 0.3);
 }
 

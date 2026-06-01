@@ -190,9 +190,14 @@ button, input, select, textarea {
     --message-block-color: rgba(30, 30, 30, 0.2);
     --el-border-color: rgba(65, 66, 67, 0.5) !important;
 
-    --glass-bg: rgba(30, 30, 30, 0.4);
+    --glass-bg: rgba(20, 10, 25, 0.5);
     --glass-border: rgba(255, 255, 255, 0.1);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* 给所有的弹出框、卡片、下拉菜单加上毛玻璃模糊特效，防止变成死板半透明 */
+.el-dialog, .el-card, .el-dropdown-menu, .el-popover, .tox-dialog {
+    backdrop-filter: blur(16px) !important;
 }
 
 .el-input {
