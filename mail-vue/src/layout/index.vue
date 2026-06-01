@@ -53,31 +53,40 @@ onBeforeUnmount(() => {
 .el-aside-hide {
   position: fixed;
   left: 0;
-  height: 100%;
+  height: calc(100% - 40px);
+  margin: 20px 0 20px 20px;
   z-index: 100;
-  transform: translateX(-100%);
-  transition: all 100ms ease;
+  transform: translateX(-150%);
+  transition: all 200ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 .aside-show {
-  -webkit-box-shadow: var(--aside-right-border);
-  box-shadow: var(--aside-right-border);
   transform: translateX(0);
-  transition: all 100ms ease;
+  transition: all 200ms cubic-bezier(0.25, 0.8, 0.25, 1);
   z-index: 101;
+  margin: 20px 0 20px 20px;
+  height: calc(100% - 40px);
+  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
   @media (max-width: 1025px) {
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 101;
+    margin: 0;
+    border-radius: 0;
     height: 100%;
+    z-index: 101;
     background: var(--el-bg-color);
   }
 }
 
 .el-aside {
   width: auto;
-  transition: all 100ms ease;
+  transition: all 200ms ease;
 }
 
 .layout {
@@ -90,19 +99,28 @@ onBeforeUnmount(() => {
 }
 
 .main-container {
-  min-height: 100%;
-  background: var(--el-bg-color);
+  height: calc(100% - 40px);
+  margin: 20px;
+  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--glass-shadow);
+  border: 1px solid var(--glass-border);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 .el-main {
   padding: 0;
+  border-radius: 20px;
 }
 
 .el-header {
-  background: var(--el-bg-color);
-  border-bottom: solid 1px var(--el-border-color);
+  background: transparent;
+  border-bottom: solid 1px var(--glass-border);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
   padding: 0 0 0 0;
 }
 

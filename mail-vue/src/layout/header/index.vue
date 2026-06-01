@@ -380,7 +380,8 @@ function formatName(email) {
     height: 34px;
     border-radius: 50%;
     color: #ffffff;
-    background: linear-gradient(135deg, #1890ff, #3a80dd);
+    background: linear-gradient(135deg, #ff9a9e, #ffb199);
+    box-shadow: 0 4px 10px rgba(255, 121, 198, 0.4);
     transition: all 0.3s ease;
     display: flex;
     align-items: center;

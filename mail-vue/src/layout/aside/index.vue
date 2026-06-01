@@ -94,7 +94,8 @@ const route = useRoute();
   justify-content: center;
   gap: 5px;
   color: #ffffff;
-  background: linear-gradient(135deg, #1890ff, #3a80dd);
+  background: linear-gradient(135deg, #ff9a9e, #ffb199);
+  box-shadow: 0 4px 15px rgba(255, 121, 198, 0.3);
   transition: all 0.3s ease;
   max-width: 240px;
   padding: 0 10px;
@@ -129,20 +130,24 @@ const route = useRoute();
 
 .el-menu-item {
   margin: 5px 10px !important;
-  border-radius: 6px;
-  height: 36px;
+  border-radius: 12px;
+  height: 40px;
   padding: 10px !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .choose-item {
   font-weight: bold;
-  background: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 121, 198, 0.4) !important;
   backdrop-filter: blur(4px);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(255, 121, 198, 0.3);
 }
 
 @media (hover: hover) {
   .el-menu-item:hover {
-    background: rgba(255, 255, 255, 0.08) !important;
+    background: rgba(255, 121, 198, 0.2) !important;
+    transform: translateY(-2px);
   }
 }
 
@@ -152,24 +157,25 @@ const route = useRoute();
 
 
 :deep(.el-scrollbar__wrap--hidden-default ) {
-  background: var(--aside-backgound) !important;
+  background: transparent !important;
 }
 
 :deep(.el-menu-item) {
-  background: var(--aside-backgound);
+  background: transparent;
 }
 
 :deep(.el-menu) {
-  background: var(--aside-backgound);
+  background: transparent;
 }
 
 .el-menu {
   border-right: 0;
   width: 260px;
+  background: transparent;
 }
 
 :deep(.el-divider__text) {
-  background: var(--aside-backgound);
+  background: transparent;
   color: #FFFFFF;
 }
 
