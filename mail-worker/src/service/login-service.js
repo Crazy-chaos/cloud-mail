@@ -20,6 +20,10 @@ import { toUtc } from '../utils/date-uitil';
 import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service';
 
+const LOGIN_FAIL_LIMIT = 5;
+const LOGIN_IP_FAIL_LIMIT = 30;
+const LOGIN_LOCK_SECONDS = 15 * 60;
+
 const loginService = {
 
 	async register(c, params, oauth = false) {
@@ -207,22 +211,39 @@ const loginService = {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
 
-		const userRow = await userService.selectByEmailIncludeDel(c, email);
-
-		if (!userRow) {
-			throw new BizError(t('notExistUser'));
+		if (!noVerifyPwd) {
+			await this.checkLoginThrottle(c, email);
 		}
 
-		if(userRow.isDel === isDel.DELETE) {
-			throw new BizError(t('isDelUser'));
+		let userRow = null;
+
+		try {
+			userRow = await userService.selectByEmailIncludeDel(c, email);
+
+			if (!userRow) {
+				throw new BizError(t('notExistUser'));
+			}
+
+			if(userRow.isDel === isDel.DELETE) {
+				throw new BizError(t('isDelUser'));
+			}
+
+			if(userRow.status === userConst.status.BAN) {
+				throw new BizError(t('isBanUser'));
+			}
+
+			if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password) && !noVerifyPwd) {
+				throw new BizError(t('IncorrectPwd'));
+			}
+		} catch (e) {
+			if (!noVerifyPwd) {
+				await this.recordLoginFailure(c, email);
+			}
+			throw e;
 		}
 
-		if(userRow.status === userConst.status.BAN) {
-			throw new BizError(t('isBanUser'));
-		}
-
-		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password) && !noVerifyPwd) {
-			throw new BizError(t('IncorrectPwd'));
+		if (!noVerifyPwd) {
+			await this.clearLoginFailure(c, email);
 		}
 
 		const uuid = uuidv4();
@@ -254,6 +275,78 @@ const loginService = {
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 		return jwt;
+	},
+
+	getLoginClientIp(c) {
+		return c.req.header('CF-Connecting-IP')
+			|| c.req.header('X-Forwarded-For')?.split(',')[0]?.trim()
+			|| c.req.header('X-Real-IP')
+			|| 'unknown';
+	},
+
+	getLoginThrottleKeys(c, email) {
+		const normalizedEmail = String(email || '').trim().toLowerCase();
+		const ip = this.getLoginClientIp(c);
+		return {
+			pairKey: `${KvConst.LOGIN_FAIL_PAIR}${encodeURIComponent(ip)}:${encodeURIComponent(normalizedEmail)}`,
+			ipKey: `${KvConst.LOGIN_FAIL_IP}${encodeURIComponent(ip)}`
+		};
+	},
+
+	getLoginLockError(record) {
+		const now = Date.now();
+		const minutes = Math.max(1, Math.ceil(((record?.lockedUntil || now) - now) / 60000));
+		return new BizError(t('loginLocked', { minutes }), 429);
+	},
+
+	async checkLoginThrottle(c, email) {
+		const { pairKey, ipKey } = this.getLoginThrottleKeys(c, email);
+		const [pairRecord, ipRecord] = await Promise.all([
+			c.env.kv.get(pairKey, { type: 'json' }),
+			c.env.kv.get(ipKey, { type: 'json' })
+		]);
+		const now = Date.now();
+
+		if (pairRecord?.lockedUntil > now) {
+			throw this.getLoginLockError(pairRecord);
+		}
+
+		if (ipRecord?.lockedUntil > now) {
+			throw this.getLoginLockError(ipRecord);
+		}
+	},
+
+	async recordLoginFailure(c, email) {
+		const { pairKey, ipKey } = this.getLoginThrottleKeys(c, email);
+		const now = Date.now();
+		const [pairRecord, ipRecord] = await Promise.all([
+			c.env.kv.get(pairKey, { type: 'json' }),
+			c.env.kv.get(ipKey, { type: 'json' })
+		]);
+
+		const nextPairRecord = this.nextLoginFailureRecord(pairRecord, LOGIN_FAIL_LIMIT, now);
+		const nextIpRecord = this.nextLoginFailureRecord(ipRecord, LOGIN_IP_FAIL_LIMIT, now);
+
+		await Promise.all([
+			c.env.kv.put(pairKey, JSON.stringify(nextPairRecord), { expirationTtl: LOGIN_LOCK_SECONDS }),
+			c.env.kv.put(ipKey, JSON.stringify(nextIpRecord), { expirationTtl: LOGIN_LOCK_SECONDS })
+		]);
+	},
+
+	nextLoginFailureRecord(record, limit, now) {
+		const count = (record?.count || 0) + 1;
+		return {
+			count,
+			lockedUntil: count >= limit ? now + LOGIN_LOCK_SECONDS * 1000 : 0
+		};
+	},
+
+	async clearLoginFailure(c, email) {
+		const { pairKey, ipKey } = this.getLoginThrottleKeys(c, email);
+		await Promise.all([
+			c.env.kv.delete(pairKey),
+			c.env.kv.delete(ipKey)
+		]);
 	},
 
 	async logout(c, userId) {

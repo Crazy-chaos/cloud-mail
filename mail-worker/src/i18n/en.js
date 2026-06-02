@@ -37,6 +37,7 @@ const en = {
 	noRegKeyTotal: 'Invite code usage limit reached',
 	regKeyExpire: 'Invite code has expired',
 	emailAndPwdEmpty: 'Email and password cannot be empty',
+	loginLocked: 'Too many failed sign-in attempts. Please try again in {{minutes}} minutes',
 	notExistUser: 'Email does not exist',
 	isDelUser: 'This email has been deleted',
 	isBanUser: 'This email has been banned',

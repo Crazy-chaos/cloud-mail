@@ -37,6 +37,7 @@ const zh = {
 	noRegKeyTotal: '注册码使用次数已耗尽',
 	regKeyExpire: '注册码已过期',
 	emailAndPwdEmpty: '邮箱和密码不能为空',
+	loginLocked: '登录失败次数过多，请 {{minutes}} 分钟后再试',
 	notExistUser: '输入的邮箱不存在',
 	isDelUser: '该邮箱已被注销',
 	isBanUser: '该邮箱已被禁用',
