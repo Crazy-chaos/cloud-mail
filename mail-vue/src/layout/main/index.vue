@@ -65,6 +65,26 @@ function showNotice(data) {
   .custom-notice.el-notification {
     --el-notification-width: min(${data.noticeWidth}px,calc(100% - 30px)) !important;
   }
+
+  @media (max-width: 767px) {
+    .custom-notice.el-notification {
+      top: calc(96px + env(safe-area-inset-top)) !important;
+      left: 14px !important;
+      right: 14px !important;
+      width: calc(100vw - 28px) !important;
+      z-index: 5000 !important;
+      pointer-events: auto !important;
+    }
+
+    .custom-notice.el-notification .el-notification__closeBtn {
+      top: 14px !important;
+      right: 14px !important;
+      z-index: 1 !important;
+      pointer-events: auto !important;
+      padding: 10px;
+      transform: translate(10px, -10px);
+    }
+  }
   `;
 
   document.head.appendChild(style);
