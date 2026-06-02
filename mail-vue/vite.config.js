@@ -34,6 +34,13 @@ export default defineConfig(({mode}) => {
                             src: 'mail-pwa.png',
                             sizes: '192x192',
                             type: 'image/png',
+                            purpose: 'any maskable'
+                        },
+                        {
+                            src: 'mail-pwa.png',
+                            sizes: '512x512',
+                            type: 'image/png',
+                            purpose: 'any maskable'
                         }
                     ],
                 },
