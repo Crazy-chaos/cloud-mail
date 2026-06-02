@@ -143,12 +143,14 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1025px) {
   .layout {
+    height: 100vh;
     height: 100dvh;
     padding: 0;
     background: transparent;
   }
 
   .main-container {
+    height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     margin: calc(22px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
     border-radius: 18px;
@@ -167,10 +169,12 @@ onBeforeUnmount(() => {
   .aside-show,
   .el-aside-hide {
     top: env(safe-area-inset-top);
+    height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 
   .overlay-show {
+    height: 100vh;
     height: 100dvh;
   }
 }

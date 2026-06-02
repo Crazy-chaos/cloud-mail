@@ -773,11 +773,47 @@ function submitRegister() {
   background: transparent !important;
   font: 100% Arial, sans-serif;
   height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
+  overflow: hidden auto;
+  -webkit-overflow-scrolling: touch;
   display: grid;
   grid-template-columns: 1fr;
+}
+
+@media (max-width: 767px) {
+  .form-wrapper {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: calc(18px + env(safe-area-inset-top)) 0 calc(18px + env(safe-area-inset-bottom));
+    box-sizing: border-box;
+    overflow: hidden auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .container {
+    max-height: calc(100vh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .github {
+    bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+
+  :deep(.bind-dialog) {
+    margin-top: calc(9vh + env(safe-area-inset-top)) !important;
+    max-height: calc(100vh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow: hidden auto;
+  }
 }
 
 
