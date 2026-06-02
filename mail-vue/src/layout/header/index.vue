@@ -19,6 +19,15 @@
       <div class="notice icon-item" @click="openNotice">
         <Icon icon="streamline-plump:announcement-megaphone"/>
       </div>
+      <el-button
+          class="logout-shortcut"
+          text
+          :loading="logoutLoading"
+          :title="$t('logOut')"
+          @click="clickLogout"
+      >
+        <Icon v-if="!logoutLoading" icon="material-symbols:logout-rounded"/>
+      </el-button>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click="userInfoHide" >
           <div class="avatar-text">
@@ -437,6 +446,21 @@ function formatName(email) {
   .notice {
     font-size: 22px;
     margin-right: 4px;
+  }
+
+  .logout-shortcut {
+    align-self: center;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    padding: 0;
+    border-radius: 4px;
+    color: var(--el-text-color-primary);
+    font-size: 20px;
+  }
+
+  .logout-shortcut:hover {
+    background: var(--base-fill);
   }
 
   .dark-icon {

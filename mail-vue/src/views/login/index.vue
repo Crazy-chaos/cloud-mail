@@ -14,8 +14,8 @@
         <span class="form-desc" v-if="show === 'login'">{{ $t('loginTitle') }}</span>
         <span class="form-desc" v-else>{{ $t('regTitle') }}</span>
         <div v-show="show === 'login'">
-          <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model="form.email"
-                    type="text" :placeholder="$t('emailAccount')" autocomplete="off">
+          <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model.trim="form.email"
+                    type="text" :placeholder="loginEmailPlaceholder" autocomplete="off">
             <template #append v-if="!hideLoginDomain">
               <div @click.stop="openSelect">
                 <el-select
@@ -49,7 +49,7 @@
           </el-button>
         </div>
         <div v-show="show !== 'login'">
-          <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model="registerForm.email" type="text" :placeholder="$t('emailAccount')"
+          <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model.trim="registerForm.email" type="text" :placeholder="loginEmailPlaceholder"
                     autocomplete="off">
             <template #append v-if="!hideLoginDomain">
               <div @click.stop="openSelect">
@@ -108,7 +108,7 @@
     </div>
     <el-dialog class="bind-dialog" v-model="showBindForm"  title="注册邮箱" >
       <div class="bind-container">
-        <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model="bindForm.email" type="text" :placeholder="$t('emailAccount')" autocomplete="off">
+        <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model.trim="bindForm.email" type="text" :placeholder="loginEmailPlaceholder" autocomplete="off">
           <template #append v-if="!hideLoginDomain">
             <div @click.stop="openSelect">
               <el-select
@@ -187,6 +187,7 @@ const form = reactive({
 
 });
 const mySelect = ref()
+const DEFAULT_LOGIN_DOMAIN = '@crazychaos.top'
 const suffix = ref('')
 const registerForm = reactive({
   email: '',
@@ -196,7 +197,7 @@ const registerForm = reactive({
 })
 const domainList = settingStore.domainList;
 const registerLoading = ref(false)
-suffix.value = domainList[0]
+suffix.value = domainList.includes(DEFAULT_LOGIN_DOMAIN) ? DEFAULT_LOGIN_DOMAIN : domainList[0]
 const verifyShow = ref(false)
 let verifyToken = ''
 let turnstileId = null
@@ -244,6 +245,7 @@ const loginDarkenFactor = computed(() => {
 })
 
 const hideLoginDomain = computed(() => settingStore.settings.loginDomain === 1)
+const loginEmailPlaceholder = computed(() => `${t('emailAccount')} / name${DEFAULT_LOGIN_DOMAIN}`)
 
 const background = computed(() => {
   const bg = settingStore.settings.background
@@ -265,11 +267,13 @@ const openSelect = () => {
 }
 
 const getFullEmail = (email) => {
-  return hideLoginDomain.value ? email : email + suffix.value
+  const value = email.trim()
+  if (value.includes('@')) return value
+  return value + (hideLoginDomain.value ? DEFAULT_LOGIN_DOMAIN : suffix.value)
 }
 
 const getEmailName = (email) => {
-  return email.split('@')[0]
+  return email.trim().split('@')[0]
 }
 
 function linuxDoLogin() {
@@ -433,7 +437,7 @@ function refreshWebsiteConfig() {
     settingStore.settings = setting
     settingStore.domainList = setting.domainList
     if (!suffix.value && setting.domainList.length > 0) {
-      suffix.value = setting.domainList[0]
+      suffix.value = setting.domainList.includes(DEFAULT_LOGIN_DOMAIN) ? DEFAULT_LOGIN_DOMAIN : setting.domainList[0]
     }
     document.title = setting.title
   }).catch(e => {

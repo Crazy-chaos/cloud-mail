@@ -15,7 +15,7 @@
         </div>
       </div>
       <div class="container">
-        <el-input-tag  @add-tag="addTagChange" tag-type="primary" @input="inputChange" size="default" v-model="form.receiveEmail" >
+        <el-input-tag class="write-field recipient-field" @add-tag="addTagChange" tag-type="primary" @input="inputChange" size="default" v-model="form.receiveEmail" >
           <template #prefix>
             <div class="item-title" >{{ $t('recipient') }}</div>
             <el-select
@@ -43,7 +43,10 @@
             </div>
           </template>
         </el-input-tag>
-        <el-input v-model="form.subject" :placeholder="t('subject')" />
+        <div class="subject-field">
+          <div class="item-title">{{ $t('subject') }}</div>
+          <el-input v-model="form.subject" :placeholder="t('subject')" />
+        </div>
         <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" />
         <div class="button-item">
           <div class="att-add" @click="chooseFile">
@@ -626,9 +629,15 @@ function close() {
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 20px;
+  @media (max-width: 1024px) {
+    padding: 0;
+  }
 
   .write-box {
-    background: var(--el-bg-color);
+    background: var(--el-bg-color-overlay);
     width: min(1367px, calc(100% - 80px));
     box-shadow: var(--el-box-shadow-light);
     border: 1px solid var(--el-border-color-light);
@@ -638,6 +647,7 @@ function close() {
     display: grid;
     grid-template-rows: auto 1fr;
     overflow: hidden;
+    color: var(--el-text-color-primary);
     @media (max-width: 1024px) {
       width: 100%;
       height: 100%;
@@ -659,6 +669,12 @@ function close() {
         align-items: center;
         display: grid;
         grid-template-columns: auto auto auto 1fr;
+        min-width: 0;
+        text-align: left;
+        @media (max-width: 640px) {
+          grid-template-columns: auto 1fr;
+          row-gap: 2px;
+        }
       }
 
       .title-text {
@@ -666,11 +682,18 @@ function close() {
 
       .sender {
         margin-left: 8px;
+        color: var(--regular-text-color);
+        @media (max-width: 640px) {
+          display: none;
+        }
       }
 
       .sender-name {
         margin-left: 8px;
         font-weight: bold;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
       }
 
       .send-email {
@@ -679,6 +702,11 @@ function close() {
         white-space: nowrap;
         text-overflow: ellipsis;
         overflow: hidden;
+        @media (max-width: 640px) {
+          grid-column: 2;
+          margin-left: 8px;
+          max-width: 100%;
+        }
       }
 
 
@@ -693,13 +721,77 @@ function close() {
       display: grid;
       grid-template-rows: auto auto 1fr auto;
       gap: 15px;
+      min-height: 0;
 
       .item-title {
+        width: 64px;
+        flex: 0 0 64px;
+        color: var(--regular-text-color);
+        font-weight: 600;
+        line-height: 30px;
+        text-align: left;
+        white-space: nowrap;
+        @media (max-width: 520px) {
+          width: 52px;
+          flex-basis: 52px;
+        }
+      }
+
+      .write-field,
+      .subject-field {
+        min-height: 40px;
+        background: var(--el-fill-color-light);
+        border: 1px solid var(--el-border-color-light);
+        border-radius: 6px;
+      }
+
+      .subject-field {
+        display: flex;
+        align-items: center;
+        padding-left: 11px;
+        :deep(.el-input__wrapper) {
+          box-shadow: none;
+          background: transparent;
+        }
+        @media (max-width: 520px) {
+          padding-left: 8px;
+        }
+      }
+
+      :deep(.el-input-tag) {
+        align-items: flex-start;
+        padding-top: 4px;
+        padding-bottom: 4px;
+      }
+
+      :deep(.el-input-tag__wrapper) {
+        background: transparent;
+        box-shadow: none;
+        min-height: 30px;
+      }
+
+      :deep(.el-input-tag__inner) {
+        min-width: 120px;
+      }
+
+      :deep(.el-tag) {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .button-item {
         display: grid;
         grid-template-columns: auto auto 1fr auto;
+        align-items: center;
+        gap: 8px;
+        min-height: 36px;
+        @media (max-width: 640px) {
+          grid-template-columns: auto auto 1fr;
+          grid-template-areas:
+            "attach clear send"
+            "list list list";
+        }
 
         .att-add {
           cursor: pointer;
@@ -707,7 +799,6 @@ function close() {
 
         .att-clear {
           cursor: pointer;
-          margin-left: 10px;
         }
 
         .att-list {
@@ -736,6 +827,28 @@ function close() {
               text-overflow: ellipsis;
               overflow: hidden;
             }
+          }
+        }
+
+        > div:last-child {
+          justify-self: end;
+        }
+
+        @media (max-width: 640px) {
+          .att-add {
+            grid-area: attach;
+          }
+
+          .att-clear {
+            grid-area: clear;
+          }
+
+          .att-list {
+            grid-area: list;
+          }
+
+          > div:last-child {
+            grid-area: send;
           }
         }
       }
