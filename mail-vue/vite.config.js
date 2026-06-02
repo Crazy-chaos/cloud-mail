@@ -27,8 +27,8 @@ export default defineConfig(({mode}) => {
                     display: 'standalone',
                     display_override: ['standalone', 'minimal-ui'],
                     orientation: 'portrait',
-                    background_color: '#FFFFFF',
-                    theme_color: '#FFFFFF',
+                    background_color: '#ffb6cf',
+                    theme_color: '#ffb6cf',
                     icons: [
                         {
                             src: 'mail-pwa.png',

@@ -12,6 +12,7 @@ html, body {
     height: 100%;
     min-height: 100%;
     overflow: hidden;
+    overscroll-behavior: none;
     background-color: #ffb6cf;
 }
 
@@ -25,8 +26,8 @@ body {
     height: 100%;
     min-height: 100%;
     position: relative;
-    z-index: 1;
     overflow: hidden;
+    background: transparent;
 }
 
 @supports (height: 100dvh) {
@@ -55,37 +56,27 @@ body {
 html, body {
     background: linear-gradient(-45deg, #ff9a9e, #fecfef, #ffb199, #ffc3a0);
     background-size: 400% 400%;
+    background-attachment: fixed;
     animation: gradientBG 15s ease infinite;
 }
 
 html.dark, html.dark body {
     background: linear-gradient(-45deg, #2b1029, #1b0f1c, #3d142d, #140b17);
     background-size: 400% 400%;
+    background-attachment: fixed;
     animation: gradientBG 15s ease infinite;
 }
 
-body::before,
-body::after {
-    content: "";
-    position: fixed;
-    left: 0;
-    right: 0;
-    pointer-events: none;
-    background: inherit;
-    background-size: inherit;
-    animation: inherit;
-}
+@supports (-webkit-touch-callout: none) {
+    html {
+        min-height: -webkit-fill-available;
+        background-color: #ffb6cf;
+    }
 
-body::before {
-    top: 0;
-    bottom: 0;
-    z-index: 0;
-}
-
-body::after {
-    bottom: 0;
-    height: max(44px, env(safe-area-inset-bottom));
-    z-index: 2;
+    body,
+    #app {
+        min-height: -webkit-fill-available;
+    }
 }
 
 @keyframes gradientBG {

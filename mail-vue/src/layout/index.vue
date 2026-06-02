@@ -94,8 +94,10 @@ onBeforeUnmount(() => {
   position: fixed;
   width: 100%;
   top: 0;
+  bottom: 0;
   left: 0;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .main-container {
@@ -109,6 +111,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--glass-border);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .el-main {
@@ -150,9 +153,9 @@ onBeforeUnmount(() => {
   }
 
   .main-container {
-    height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    margin: calc(22px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
+    height: calc(100vh - 30px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    height: calc(100dvh - 30px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    margin: calc(22px + env(safe-area-inset-top)) 12px calc(8px + env(safe-area-inset-bottom));
     border-radius: 18px;
   }
 
