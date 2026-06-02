@@ -140,4 +140,38 @@ onBeforeUnmount(() => {
   pointer-events: none;
   opacity: 0;
 }
+
+@media (max-width: 1025px) {
+  .layout {
+    height: 100dvh;
+    padding: 0;
+    background: transparent;
+  }
+
+  .main-container {
+    height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    margin: calc(22px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
+    border-radius: 18px;
+  }
+
+  .el-main {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .el-header {
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+  }
+
+  .aside-show,
+  .el-aside-hide {
+    top: env(safe-area-inset-top);
+    height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  .overlay-show {
+    height: 100dvh;
+  }
+}
 </style>

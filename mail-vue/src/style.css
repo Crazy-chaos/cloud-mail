@@ -10,11 +10,22 @@
 html, body {
     width: 100%;
     height: 100%;
+    min-height: 100%;
+    overflow: hidden;
+    background-color: #ffb6cf;
 }
 
 #app {
     width: 100%;
     height: 100%;
+    min-height: 100%;
+}
+
+@supports (height: 100dvh) {
+    html, body, #app {
+        height: 100dvh;
+        min-height: 100dvh;
+    }
 }
 
 :deep(.el-input__inner:focus) {
