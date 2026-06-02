@@ -21,6 +21,12 @@ export default defineConfig(({mode}) => {
                 manifest: {
                     name: env.VITE_PWA_NAME,
                     short_name: env.VITE_PWA_NAME,
+                    id: '/',
+                    start_url: '/',
+                    scope: '/',
+                    display: 'standalone',
+                    display_override: ['standalone', 'minimal-ui'],
+                    orientation: 'portrait',
                     background_color: '#FFFFFF',
                     theme_color: '#FFFFFF',
                     icons: [
