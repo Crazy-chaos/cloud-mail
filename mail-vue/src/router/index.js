@@ -86,7 +86,7 @@ NProgress.configure({
 let timer
 let first = true
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
 
     if (timer) {
         clearTimeout(timer)
@@ -101,10 +101,16 @@ router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('token')
 
     if (!token && to.name !== 'login') {
+        if (await hasCookieAuth()) {
+            return next()
+        }
         return next({name: 'login'})
     }
 
     if (!token && to.name === 'login') {
+        if (await hasCookieAuth()) {
+            return next({name: 'email'})
+        }
         loadBackground(next)
         return
     }
@@ -116,6 +122,15 @@ router.beforeEach((to, from, next) => {
     next()
 
 })
+
+async function hasCookieAuth() {
+    return fetch(`${import.meta.env.VITE_BASE_URL}/my/loginUserInfo`, {
+        credentials: 'include'
+    })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => data?.code === 200)
+        .catch(() => false);
+}
 
 function loadBackground(next) {
 

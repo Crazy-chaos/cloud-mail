@@ -4,7 +4,20 @@ const app = new Hono();
 import result from '../model/result';
 import { cors } from 'hono/cors';
 
-app.use('*', cors());
+const allowedOrigins = new Set([
+	'https://www.crazychaos.top',
+	'https://crazychaos.top',
+	'http://localhost:5555',
+	'http://127.0.0.1:5555'
+]);
+
+app.use('*', cors({
+	origin: (origin) => allowedOrigins.has(origin) ? origin : 'https://www.crazychaos.top',
+	credentials: true,
+	allowHeaders: ['Content-Type', 'Authorization', 'accept-language'],
+	allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+	maxAge: 86400
+}));
 
 app.onError((err, c) => {
 	if (err.name === 'BizError') {

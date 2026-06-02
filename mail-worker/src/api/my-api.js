@@ -13,6 +13,11 @@ app.put('/my/resetPassword', async (c) => {
 	return c.json(result.ok());
 });
 
+app.put('/my/profile', async (c) => {
+	const profile = await userService.updateNickname(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok(profile));
+});
+
 app.delete('/my/delete', async (c) => {
 	await userService.delete(c, userContext.getUserId(c));
 	return c.json(result.ok());

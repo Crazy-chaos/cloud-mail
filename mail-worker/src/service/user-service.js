@@ -39,8 +39,9 @@ const userService = {
 		user.userId = userRow.userId;
 		user.sendCount = userRow.sendCount;
 		user.email = userRow.email;
+		user.nickname = userRow.nickname || '';
 		user.account = account;
-		user.name = account.name;
+		user.name = userRow.nickname || account.name;
 		user.permKeys = permKeys;
 		user.role = roleRow;
 		user.type = userRow.type;
@@ -63,6 +64,29 @@ const userService = {
 		}
 		const { salt, hash } = await cryptoUtils.hashPassword(password);
 		await orm(c).update(user).set({ password: hash, salt: salt }).where(eq(user.userId, userId)).run();
+	},
+
+	async updateNickname(c, params, userId) {
+
+		const nickname = String(params.nickname || '').trim();
+
+		if (nickname.length > 24) {
+			throw new BizError('Nickname cannot exceed 24 characters');
+		}
+
+		if (/[<>]/.test(nickname)) {
+			throw new BizError('Nickname contains invalid characters');
+		}
+
+		await orm(c).update(user).set({ nickname }).where(eq(user.userId, userId)).run();
+
+		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+		if (authInfo) {
+			authInfo.user.nickname = nickname;
+			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		}
+
+		return { nickname };
 	},
 
 	selectByEmail(c, email) {

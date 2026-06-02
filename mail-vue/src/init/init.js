@@ -14,7 +14,6 @@ export async function init() {
     const userStore = useUserStore();
     const accountStore = useAccountStore();
 
-    const token = localStorage.getItem('token');
     if (!settingStore.lang) {
         let lang = navigator.language.split('-')[0]
         lang = lang === 'zh' ? lang : 'en'
@@ -25,33 +24,25 @@ export async function init() {
 
     let setting = null;
 
-    if (token) {
-        const userPromise = loginUserInfo().catch(e => {
-            console.error(e);
-            return null;
+    const userPromise = loginUserInfo(true).catch(e => {
+        console.error(e);
+        return null;
+    });
+
+    const [s, user] = await Promise.all([websiteConfig(), userPromise]);
+    setting = s;
+    settingStore.settings = setting;
+    settingStore.domainList = setting.domainList;
+    document.title = setting.title;
+
+    if (user) {
+        accountStore.currentAccountId = user.account.accountId;
+        accountStore.currentAccount = user.account;
+        userStore.user = user;
+
+        const routers = permsToRouter(user.permKeys);
+        routers.forEach(routerData => {
+            router.addRoute('layout', routerData);
         });
-
-        const [s, user] = await Promise.all([websiteConfig(), userPromise]);
-        setting = s;
-        settingStore.settings = setting;
-        settingStore.domainList = setting.domainList;
-        document.title = setting.title;
-
-        if (user) {
-            accountStore.currentAccountId = user.account.accountId;
-            accountStore.currentAccount = user.account;
-            userStore.user = user;
-
-            const routers = permsToRouter(user.permKeys);
-            routers.forEach(routerData => {
-                router.addRoute('layout', routerData);
-            });
-        }
-
-    } else {
-        setting = await websiteConfig();
-        settingStore.settings = setting;
-        settingStore.domainList = setting.domainList;
-        document.title = setting.title;
     }
 }
