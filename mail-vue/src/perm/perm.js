@@ -118,5 +118,15 @@ const routers = {
             name: 'analysis',
             menu: true
         }
+    }],
+    'blog:manage': [{
+        path: '/blog-admin',
+        name: 'blog-admin',
+        component: () => import('@/views/blog/index.vue'),
+        meta: {
+            title: 'blog',
+            name: 'blog-admin',
+            menu: true
+        }
     }]
 }

@@ -30,8 +30,40 @@ const dbInit = {
 		await this.v2_9DB(c);
 		await this.v3_0DB(c);
 		await this.v3_1DB(c);
+		await this.v3_2DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_2DB(c) {
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS blog_post (
+					post_id INTEGER PRIMARY KEY AUTOINCREMENT,
+					slug TEXT NOT NULL UNIQUE,
+					title TEXT NOT NULL,
+					summary TEXT NOT NULL DEFAULT '',
+					cover_key TEXT NOT NULL DEFAULT '',
+					content_key TEXT NOT NULL DEFAULT '',
+					category TEXT NOT NULL DEFAULT '',
+					tags TEXT NOT NULL DEFAULT '[]',
+					status TEXT NOT NULL DEFAULT 'draft',
+					view_count INTEGER NOT NULL DEFAULT 0,
+					created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					published_at TEXT
+				)
+			`).run();
+			await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_blog_post_slug ON blog_post(slug)').run();
+			await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_blog_post_status_published ON blog_post(status, published_at)').run();
+			await c.env.db.prepare(`
+				INSERT INTO perm (name, perm_key, pid, type, sort)
+				SELECT '博客管理', 'blog:manage', 17, 2, 8
+				WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'blog:manage')
+			`).run();
+		} catch (e) {
+			console.warn(`跳过博客表初始化：${e.message}`);
+		}
 	},
 
 	async v3_1DB(c) {

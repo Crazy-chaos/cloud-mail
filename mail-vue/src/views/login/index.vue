@@ -772,9 +772,8 @@ function submitRegister() {
 #login-box {
   background: transparent !important;
   font: 100% Arial, sans-serif;
-  height: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: var(--app-height);
+  min-height: var(--app-height);
   margin: 0;
   padding: 0;
   overflow: hidden auto;
@@ -788,9 +787,8 @@ function submitRegister() {
     position: fixed;
     inset: 0;
     width: auto;
-    height: auto;
-    min-height: 100vh;
-    min-height: 100dvh;
+    height: var(--app-height);
+    min-height: var(--app-height);
     padding: calc(18px + env(safe-area-inset-top)) 0 calc(18px + env(safe-area-inset-bottom));
     box-sizing: border-box;
     overflow: hidden auto;
@@ -798,8 +796,7 @@ function submitRegister() {
   }
 
   .container {
-    max-height: calc(100vh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    max-height: calc(100dvh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(var(--app-height) - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -810,8 +807,7 @@ function submitRegister() {
 
   :deep(.bind-dialog) {
     margin-top: calc(9vh + env(safe-area-inset-top)) !important;
-    max-height: calc(100vh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    max-height: calc(100dvh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(var(--app-height) - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     overflow: hidden auto;
   }
 }

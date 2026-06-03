@@ -90,7 +90,8 @@ onBeforeUnmount(() => {
 }
 
 .layout {
-  height: 100%;
+  height: var(--app-height);
+  min-height: var(--app-height);
   position: fixed;
   width: 100%;
   top: 0;
@@ -98,10 +99,12 @@ onBeforeUnmount(() => {
   left: 0;
   overflow: hidden;
   overscroll-behavior: none;
+  background: var(--app-page-bg);
+  background-size: 400% 400%;
 }
 
 .main-container {
-  height: calc(100% - 40px);
+  height: calc(var(--app-height) - 40px);
   margin: 20px;
   border-radius: 20px;
   background: var(--glass-bg);
@@ -146,16 +149,16 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1025px) {
   .layout {
-    height: 100vh;
-    height: 100dvh;
+    height: var(--app-height);
+    min-height: var(--app-height);
     padding: 0;
-    background: transparent;
+    background: var(--app-page-bg);
+    background-size: 400% 400%;
   }
 
   .main-container {
-    height: calc(100vh - 30px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    height: calc(100dvh - 30px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    margin: calc(22px + env(safe-area-inset-top)) 12px calc(8px + env(safe-area-inset-bottom));
+    height: calc(var(--app-height) - 30px - env(safe-area-inset-top));
+    margin: calc(22px + env(safe-area-inset-top)) 12px 8px;
     border-radius: 18px;
   }
 
@@ -172,13 +175,11 @@ onBeforeUnmount(() => {
   .aside-show,
   .el-aside-hide {
     top: env(safe-area-inset-top);
-    height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    height: calc(var(--app-height) - env(safe-area-inset-top));
   }
 
   .overlay-show {
-    height: 100vh;
-    height: 100dvh;
+    height: var(--app-height);
   }
 }
 </style>

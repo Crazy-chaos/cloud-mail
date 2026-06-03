@@ -31,7 +31,7 @@
           <Icon icon="fluent:settings-48-regular" width="20" height="20" />
           <span class="menu-name" style="margin-left: 21px">{{$t('settings')}}</span>
         </el-menu-item>
-        <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
+        <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query','blog:manage']">
           <div>{{$t('manage')}}</div>
         </div>
         <el-menu-item @click="router.push({name: 'analysis'})" index="analysis" v-perm="'analysis:query'"
@@ -58,6 +58,11 @@
                       :class="route.meta.name === 'reg-key' ? 'choose-item' : ''">
           <Icon icon="fluent:fingerprint-20-filled" width="22" height="22" />
           <span class="menu-name" style="margin-left: 20px">{{$t('inviteCode')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'blog-admin'})" index="blog-admin" v-perm="'blog:manage'"
+                      :class="route.meta.name === 'blog-admin' ? 'choose-item' : ''">
+          <Icon icon="fluent:document-text-sparkle-24-regular" width="22" height="22" />
+          <span class="menu-name" style="margin-left: 20px">博客</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'sys-setting'})" index="sys-setting" v-perm="'setting:query'"
                       :class="route.meta.name === 'sys-setting' ? 'choose-item' : ''">

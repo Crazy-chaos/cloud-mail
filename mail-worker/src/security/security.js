@@ -18,7 +18,10 @@ const exclude = [
 	'/public/genToken',
 	'/telegram',
 	'/test',
-	'/oauth'
+	'/oauth',
+	'/blog/list',
+	'/blog/detail',
+	'/blog/rss'
 ];
 
 const requirePerms = [
@@ -58,7 +61,10 @@ const requirePerms = [
 	'/regKey/list',
 	'/regKey/delete',
 	'/regKey/clearNotUse',
-	'/regKey/history'
+	'/regKey/history',
+	'/blog/post',
+	'/blog/admin',
+	'/blog/upload'
 ];
 
 const premKey = {
@@ -87,6 +93,7 @@ const premKey = {
 	'reg-key:add': ['/regKey/add'],
 	'reg-key:query': ['/regKey/list','/regKey/history'],
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
+	'blog:manage': ['/blog/post', '/blog/admin', '/blog/upload'],
 };
 
 app.use('*', async (c, next) => {
