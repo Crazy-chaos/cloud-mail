@@ -128,5 +128,15 @@ const routers = {
             name: 'blog-admin',
             menu: true
         }
+    }],
+    'blog:manage_own': [{
+        path: '/blog-admin',
+        name: 'blog-admin',
+        component: () => import('@/views/blog/index.vue'),
+        meta: {
+            title: 'blog',
+            name: 'blog-admin',
+            menu: true
+        }
     }]
 }
