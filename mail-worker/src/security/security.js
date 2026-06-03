@@ -94,6 +94,7 @@ const premKey = {
 	'reg-key:query': ['/regKey/list','/regKey/history'],
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 	'blog:manage': ['/blog/post', '/blog/admin', '/blog/upload'],
+	'blog:manage_own': ['/blog/post', '/blog/admin', '/blog/upload'],
 };
 
 app.use('*', async (c, next) => {
