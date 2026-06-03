@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS blog_post (
 	view_count INTEGER NOT NULL DEFAULT 0,
 	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	published_at TEXT
+	published_at TEXT,
+	user_id INTEGER DEFAULT 0
 )`;
 
 function bindMaybe(statement, params) {
@@ -26,6 +27,11 @@ function bindMaybe(statement, params) {
 const blogService = {
 	async ensureTables(c) {
 		await c.env.db.prepare(TABLE_SQL).run();
+		try {
+			await c.env.db.prepare('ALTER TABLE blog_post ADD COLUMN user_id INTEGER DEFAULT 0').run();
+		} catch (e) {
+			// column already exists
+		}
 		await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_blog_post_slug ON blog_post(slug)').run();
 		await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_blog_post_status_published ON blog_post(status, published_at)').run();
 		await this.ensurePerm(c);
@@ -37,6 +43,11 @@ const blogService = {
 				INSERT INTO perm (name, perm_key, pid, type, sort)
 				SELECT '博客管理', 'blog:manage', 17, 2, 8
 				WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'blog:manage')
+			`).run();
+			await c.env.db.prepare(`
+				INSERT INTO perm (name, perm_key, pid, type, sort)
+				SELECT '管理自己博客', 'blog:manage_own', 17, 2, 9
+				WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'blog:manage_own')
 			`).run();
 		} catch (error) {
 			console.warn('skip blog perm init', error.message);
@@ -116,6 +127,16 @@ const blogService = {
 			filters.push('(title LIKE ? OR summary LIKE ? OR category LIKE ? OR tags LIKE ?)');
 			const keyword = `%${q}%`;
 			params.push(keyword, keyword, keyword, keyword);
+		}
+
+		const user = c.get('user');
+		const permKeys = user ? await permService.userPermKeys(c, user.userId) : [];
+		const isSuperAdmin = user && user.email === c.env.admin;
+		const canManageAll = isSuperAdmin || permKeys.includes('blog:manage') || permKeys.includes('*');
+
+		if (!canManageAll && permKeys.includes('blog:manage_own') && user) {
+			filters.push('user_id = ?');
+			params.push(user.userId);
 		}
 
 		const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
@@ -219,6 +240,11 @@ const blogService = {
 		if (!slug) throw new BizError('Slug is required', 400);
 		if (!title) throw new BizError('Title is required', 400);
 
+		const allowed = await this.canManagePost(c, slug);
+		if (!allowed) {
+			throw new BizError('Permission denied to manage this blog post', 403);
+		}
+
 		const oldRow = await c.env.db
 			.prepare('SELECT content_key FROM blog_post WHERE slug = ?')
 			.bind(slug)
@@ -241,10 +267,12 @@ const blogService = {
 			: (payload.publishedAt || payload.published_at || null);
 		const tags = this.stringifyTags(payload.tags);
 
+		const user = c.get('user');
+
 		await c.env.db
 			.prepare(`
-				INSERT INTO blog_post (slug, title, summary, cover_key, content_key, category, tags, status, created_at, updated_at, published_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				INSERT INTO blog_post (slug, title, summary, cover_key, content_key, category, tags, status, created_at, updated_at, published_at, user_id)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				ON CONFLICT(slug) DO UPDATE SET
 					title = excluded.title,
 					summary = excluded.summary,
@@ -267,7 +295,8 @@ const blogService = {
 				status,
 				now,
 				now,
-				publishedAt
+				publishedAt,
+				user?.userId || 0
 			)
 			.run();
 
@@ -314,7 +343,7 @@ const blogService = {
 		await this.assertCanManage(c);
 		const row = await c.env.db
 			.prepare(`
-				SELECT post_id, slug, title, summary, cover_key, content_key, category, tags, status, view_count, created_at, updated_at, published_at
+				SELECT post_id, slug, title, summary, cover_key, content_key, category, tags, status, view_count, created_at, updated_at, published_at, user_id
 				FROM blog_post
 				WHERE slug = ?
 			`)
@@ -323,6 +352,17 @@ const blogService = {
 
 		if (!row) {
 			throw new BizError('Post not found', 404);
+		}
+
+		const user = c.get('user');
+		const isSuperAdmin = user && user.email === c.env.admin;
+		const permKeys = user ? await permService.userPermKeys(c, user.userId) : [];
+		const canManageAll = isSuperAdmin || permKeys.includes('blog:manage') || permKeys.includes('*');
+
+		if (!canManageAll && permKeys.includes('blog:manage_own')) {
+			if (row.user_id !== user.userId) {
+				throw new BizError('Permission denied to view this blog post', 403);
+			}
 		}
 
 		return {
@@ -336,6 +376,12 @@ const blogService = {
 	async delete(c, slug) {
 		await this.ensureTables(c);
 		await this.assertCanManage(c);
+
+		const allowed = await this.canManagePost(c, slug);
+		if (!allowed) {
+			throw new BizError('Permission denied to delete this blog post', 403);
+		}
+
 		const row = await c.env.db
 			.prepare('SELECT content_key FROM blog_post WHERE slug = ?')
 			.bind(slug)
@@ -469,9 +515,30 @@ const blogService = {
 		if (user.email === c.env.admin) return;
 
 		const permKeys = await permService.userPermKeys(c, user.userId);
-		if (!permKeys.includes('blog:manage') && !permKeys.includes('*')) {
+		if (!permKeys.includes('blog:manage') && !permKeys.includes('blog:manage_own') && !permKeys.includes('*')) {
 			throw new BizError('Only admin can manage blog posts', 403);
 		}
+	},
+
+	async canManagePost(c, slug) {
+		const user = c.get('user');
+		if (!user) return false;
+		if (user.email === c.env.admin) return true;
+
+		const permKeys = await permService.userPermKeys(c, user.userId);
+		if (permKeys.includes('blog:manage') || permKeys.includes('*')) {
+			return true;
+		}
+		if (permKeys.includes('blog:manage_own')) {
+			if (!slug) return true;
+			const oldRow = await c.env.db
+				.prepare('SELECT user_id FROM blog_post WHERE slug = ?')
+				.bind(slug)
+				.first();
+			if (!oldRow) return true;
+			return oldRow.user_id === user.userId;
+		}
+		return false;
 	}
 };
 

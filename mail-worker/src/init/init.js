@@ -31,8 +31,26 @@ const dbInit = {
 		await this.v3_0DB(c);
 		await this.v3_1DB(c);
 		await this.v3_2DB(c);
+		await this.v3_3DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_3DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE blog_post ADD COLUMN user_id INTEGER DEFAULT 0;`).run();
+		} catch (e) {
+			console.warn(`跳过增加 blog_post.user_id 字段：${e.message}`);
+		}
+		try {
+			await c.env.db.prepare(`
+				INSERT INTO perm (name, perm_key, pid, type, sort)
+				SELECT '管理自己博客', 'blog:manage_own', 17, 2, 9
+				WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'blog:manage_own')
+			`).run();
+		} catch (e) {
+			console.warn(`跳过增加 blog:manage_own 权限：${e.message}`);
+		}
 	},
 
 	async v3_2DB(c) {
