@@ -61,7 +61,7 @@
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'blog-admin'})" index="blog-admin" v-perm="['blog:manage','blog:manage_own']"
                       :class="route.meta.name === 'blog-admin' ? 'choose-item' : ''">
-          <Icon icon="fluent:document-text-sparkle-24-regular" width="22" height="22" />
+          <Icon icon="fluent:document-sparkle-24-regular" width="22" height="22" />
           <span class="menu-name" style="margin-left: 20px">博客</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'sys-setting'})" index="sys-setting" v-perm="'setting:query'"

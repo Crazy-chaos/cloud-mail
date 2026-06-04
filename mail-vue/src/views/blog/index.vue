@@ -2,7 +2,7 @@
   <div class="blog-admin">
     <div class="blog-toolbar">
       <div class="toolbar-title">
-        <Icon icon="fluent:document-text-sparkle-24-regular" width="24" height="24" />
+        <Icon icon="fluent:document-sparkle-24-regular" width="24" height="24" />
         <span>博客管理</span>
       </div>
       <div class="toolbar-actions">
