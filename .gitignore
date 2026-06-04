@@ -29,5 +29,6 @@ mail-vue/dist
 # Local private Cloudflare config and secrets. Keep public configs redacted.
 mail-worker/wrangler.local.toml
 mail-worker/wrangler-private.toml
+mail-worker/wrangler.generated.toml
 mail-worker/.dev.vars
 mail-worker/.env
