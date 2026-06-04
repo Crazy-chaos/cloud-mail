@@ -104,6 +104,7 @@ const en = {
 		"管理自己博客": "Manage Own Blog",
 		"资源管理": "Resource Management",
 		"管理自己资源": "Manage Own Resources",
+		"博客资源管理": "Blog & Resources",
 		"发件重置": "Reset Send Count"
 	}
 };

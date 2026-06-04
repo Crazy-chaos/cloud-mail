@@ -144,11 +144,35 @@ const dbInit = {
 		try {
 			await c.env.db.prepare(`
 				INSERT INTO perm (name, perm_key, pid, type, sort)
-				SELECT '管理自己资源', 'tools:manage_own', 17, 2, 11
+				SELECT '博客资源管理', 'blog_tools:group', 0, 1, 7
+				WHERE NOT EXISTS (SELECT 1 FROM perm WHERE name = '博客资源管理')
+			`).run();
+		} catch (e) {
+			console.warn(`跳过增加 博客资源管理 栏目：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`
+				INSERT INTO perm (name, perm_key, pid, type, sort)
+				SELECT '管理自己资源', 'tools:manage_own', 0, 2, 11
 				WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'tools:manage_own')
 			`).run();
 		} catch (e) {
 			console.warn(`跳过增加 tools:manage_own 权限：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`
+				UPDATE perm 
+				SET pid = (SELECT perm_id FROM perm WHERE name = '博客资源管理' LIMIT 1)
+				WHERE perm_key IN ('blog:manage', 'blog:manage_own', 'tools:manage', 'tools:manage_own');
+			`).run();
+			await c.env.db.prepare(`UPDATE perm SET sort = 1 WHERE perm_key = 'blog:manage'`).run();
+			await c.env.db.prepare(`UPDATE perm SET sort = 2 WHERE perm_key = 'blog:manage_own'`).run();
+			await c.env.db.prepare(`UPDATE perm SET sort = 3 WHERE perm_key = 'tools:manage'`).run();
+			await c.env.db.prepare(`UPDATE perm SET sort = 4 WHERE perm_key = 'tools:manage_own'`).run();
+		} catch (e) {
+			console.warn(`跳过更新权限分类归属：${e.message}`);
 		}
 	},
 
