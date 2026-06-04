@@ -43,15 +43,63 @@ const toolService = {
 		return permKeys.includes('tools:manage') || permKeys.includes('*');
 	},
 
-	async assertCanManage(c) {
+	async assertCanManage(c, idOrSlug) {
 		const user = await this.currentUserOptional(c);
 		if (!user) {
 			throw new BizError('Login required', 401);
 		}
-		const isAdmin = await this.isUserAdmin(c, user);
-		if (!isAdmin) {
+		const permKeys = await permService.userPermKeys(c, user.userId);
+		const hasPerm = permKeys.includes('tools:manage') || 
+		                permKeys.includes('tools:manage_own') || 
+		                permKeys.includes('*') || 
+		                user.email === c.env.admin;
+		                
+		if (!hasPerm) {
 			throw new BizError('Permission denied', 403);
 		}
+		
+		if (idOrSlug && !permKeys.includes('tools:manage') && !permKeys.includes('*') && user.email !== c.env.admin) {
+			const canManage = await this.canManageTool(c, idOrSlug);
+			if (!canManage) {
+				throw new BizError('Permission denied: You can only manage your own tools', 403);
+			}
+		}
+	},
+
+	async assertCanManageSystem(c) {
+		const user = await this.currentUserOptional(c);
+		if (!user) {
+			throw new BizError('Login required', 401);
+		}
+		const permKeys = await permService.userPermKeys(c, user.userId);
+		const hasPerm = permKeys.includes('tools:manage') || 
+		                permKeys.includes('*') || 
+		                user.email === c.env.admin;
+		                
+		if (!hasPerm) {
+			throw new BizError('Permission denied: Admin role required to manage system tags/categories', 403);
+		}
+	},
+
+	async canManageTool(c, idOrSlug) {
+		const user = await this.currentUserOptional(c);
+		if (!user) return false;
+		if (user.email === c.env.admin) return true;
+
+		const permKeys = await permService.userPermKeys(c, user.userId);
+		if (permKeys.includes('tools:manage') || permKeys.includes('*')) {
+			return true;
+		}
+		if (permKeys.includes('tools:manage_own')) {
+			if (!idOrSlug) return true;
+			const oldRow = await c.env.db
+				.prepare('SELECT created_by FROM tools WHERE id = ? OR slug = ?')
+				.bind(idOrSlug, idOrSlug)
+				.first();
+			if (!oldRow) return true;
+			return oldRow.created_by === user.email;
+		}
+		return false;
 	},
 
 	async list(c) {
@@ -129,9 +177,10 @@ const toolService = {
 
 		const rows = await c.env.db
 			.prepare(`
-				SELECT t.*, c.name AS category_name, c.icon AS category_icon
+				SELECT t.*, c.name AS category_name, c.icon AS category_icon, u.nickname AS creator_nickname, u.email AS creator_email
 				FROM tools t
 				LEFT JOIN categories c ON c.id = t.category_id
+				LEFT JOIN user u ON u.email = t.created_by
 				${whereClause}
 				ORDER BY ${orderBy}
 				LIMIT ? OFFSET ?
@@ -160,9 +209,10 @@ const toolService = {
 
 		const row = await c.env.db
 			.prepare(`
-				SELECT t.*, c.name AS category_name, c.icon AS category_icon
+				SELECT t.*, c.name AS category_name, c.icon AS category_icon, u.nickname AS creator_nickname, u.email AS creator_email
 				FROM tools t
 				LEFT JOIN categories c ON c.id = t.category_id
+				LEFT JOIN user u ON u.email = t.created_by
 				WHERE t.id = ? OR t.slug = ?
 			`)
 			.bind(idOrSlug, idOrSlug)
@@ -288,7 +338,7 @@ const toolService = {
 	},
 
 	async save(c, payload) {
-		await this.assertCanManage(c);
+		await this.assertCanManage(c, payload.id);
 
 		const id = payload.id || crypto.randomUUID();
 		const title = String(payload.title || '').trim();
@@ -381,7 +431,7 @@ const toolService = {
 	},
 
 	async delete(c, id) {
-		await this.assertCanManage(c);
+		await this.assertCanManage(c, id);
 
 		// Get urls/paths to delete R2 objects
 		const row = await c.env.db.prepare('SELECT cover_url, content_url, download_url FROM tools WHERE id = ?').bind(id).first();
@@ -457,7 +507,7 @@ const toolService = {
 	},
 
 	async saveCategory(c, payload) {
-		await this.assertCanManage(c);
+		await this.assertCanManageSystem(c);
 		const id = payload.id || crypto.randomUUID();
 		const name = String(payload.name || '').trim();
 		const icon = String(payload.icon || '').trim();
@@ -481,7 +531,7 @@ const toolService = {
 	},
 
 	async deleteCategory(c, id) {
-		await this.assertCanManage(c);
+		await this.assertCanManageSystem(c);
 		// Check if tools are using this category
 		const countRow = await c.env.db.prepare('SELECT COUNT(*) as total FROM tools WHERE category_id = ?').bind(id).first();
 		if (countRow?.total > 0) {
@@ -492,7 +542,7 @@ const toolService = {
 	},
 
 	async saveTag(c, payload) {
-		await this.assertCanManage(c);
+		await this.assertCanManageSystem(c);
 		const id = payload.id || crypto.randomUUID();
 		const name = String(payload.name || '').trim();
 
@@ -511,7 +561,7 @@ const toolService = {
 	},
 
 	async deleteTag(c, id) {
-		await this.assertCanManage(c);
+		await this.assertCanManageSystem(c);
 		await c.env.db.prepare('DELETE FROM tags WHERE id = ?').bind(id).run();
 		await c.env.db.prepare('DELETE FROM tool_tags WHERE tag_id = ?').bind(id).run();
 		return true;
@@ -573,6 +623,10 @@ const toolService = {
 			downloadCount: row.download_count || 0,
 			status: row.status || 'published',
 			createdBy: row.created_by || '',
+			creator: row.created_by ? {
+				nickname: row.creator_nickname || '',
+				email: row.creator_email || row.created_by
+			} : null,
 			createdAt: row.created_at,
 			updatedAt: row.updated_at,
 			tags,

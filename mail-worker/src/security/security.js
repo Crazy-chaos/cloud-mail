@@ -100,7 +100,8 @@ const premKey = {
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 	'blog:manage': ['/blog/post', '/blog/admin', '/blog/upload'],
 	'blog:manage_own': ['/blog/post', '/blog/admin', '/blog/upload'],
-	'tools:manage': ['/admin/tools', '/admin/categories', '/admin/tags']
+	'tools:manage': ['/admin/tools', '/admin/categories', '/admin/tags'],
+	'tools:manage_own': ['/admin/tools']
 };
 
 app.use('*', async (c, next) => {
