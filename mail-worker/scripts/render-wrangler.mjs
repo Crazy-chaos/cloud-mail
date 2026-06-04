@@ -25,6 +25,9 @@ if (existsSync('.env')) {
 	}
 }
 
+// Helper to get environment variable case-insensitively
+const getEnv = (key) => process.env[key] || process.env[key.toLowerCase()];
+
 const required = [
 	'ADMIN',
 	'JWT_SECRET',
@@ -33,25 +36,25 @@ const required = [
 	'R2_BUCKET_NAME'
 ];
 
-const missing = required.filter((key) => !process.env[key]);
+const missing = required.filter((key) => !getEnv(key));
 if (missing.length) {
 	console.error(`Missing required environment variables: ${missing.join(', ')}`);
 	process.exit(1);
 }
 
-const name = process.env.NAME || 'cloud-mail';
-const customDomain = process.env.CUSTOM_DOMAIN || '';
-const domain = process.env.DOMAIN || '[]';
-const aiModel = process.env.AI_MODEL || '@cf/meta/llama-3.1-8b-instruct';
-const analysisCache = process.env.ANALYSIS_CACHE || 'false';
-const projectLink = process.env.PROJECT_LINK || '';
-const linuxdoClientId = process.env.LINUXDO_CLIENT_ID || '';
-const linuxdoClientSecret = process.env.LINUXDO_CLIENT_SECRET || '';
-const linuxdoCallbackUrl = process.env.LINUXDO_CALLBACK_URL || '';
-const linuxdoSwitch = process.env.LINUXDO_SWITCH || '';
-const turnstileSiteKey = process.env.TURNSTILE_SITE_KEY || process.env.turnstile_site_key || '';
-const turnstileSecretKey = process.env.TURNSTILE_SECRET_KEY || process.env.turnstile_secret_key || '';
-const cfEmail = String(process.env.CF_EMAIL || process.env.CLOUDFLARE_EMAIL || '').toLowerCase() === 'true';
+const name = getEnv('NAME') || 'cloud-mail';
+const customDomain = getEnv('CUSTOM_DOMAIN') || '';
+const domain = getEnv('DOMAIN') || '[]';
+const aiModel = getEnv('AI_MODEL') || '@cf/meta/llama-3.1-8b-instruct';
+const analysisCache = getEnv('ANALYSIS_CACHE') || 'false';
+const projectLink = getEnv('PROJECT_LINK') || '';
+const linuxdoClientId = getEnv('LINUXDO_CLIENT_ID') || '';
+const linuxdoClientSecret = getEnv('LINUXDO_CLIENT_SECRET') || '';
+const linuxdoCallbackUrl = getEnv('LINUXDO_CALLBACK_URL') || '';
+const linuxdoSwitch = getEnv('LINUXDO_SWITCH') || '';
+const turnstileSiteKey = getEnv('TURNSTILE_SITE_KEY') || '';
+const turnstileSecretKey = getEnv('TURNSTILE_SECRET_KEY') || '';
+const cfEmail = String(getEnv('CF_EMAIL') || getEnv('CLOUDFLARE_EMAIL') || '').toLowerCase() === 'true';
 
 function q(value) {
 	return JSON.stringify(String(value));
@@ -89,15 +92,15 @@ lines.push(
 	'[[d1_databases]]',
 	'binding = "db"',
 	'database_name = "cloudmail"',
-	`database_id = ${q(process.env.D1_DATABASE_ID)}`,
+	`database_id = ${q(getEnv('D1_DATABASE_ID'))}`,
 	'',
 	'[[kv_namespaces]]',
 	'binding = "kv"',
-	`id = ${q(process.env.KV_NAMESPACE_ID)}`,
+	`id = ${q(getEnv('KV_NAMESPACE_ID'))}`,
 	'',
 	'[[r2_buckets]]',
 	'binding = "r2"',
-	`bucket_name = ${q(process.env.R2_BUCKET_NAME)}`,
+	`bucket_name = ${q(getEnv('R2_BUCKET_NAME'))}`,
 	'',
 	'[ai]',
 	'binding = "ai"',
@@ -113,8 +116,8 @@ lines.push(
 	'',
 	'[vars]',
 	`domain = ${rawJsonArray(domain)}`,
-	`admin = ${q(process.env.ADMIN)}`,
-	`jwt_secret = ${q(process.env.JWT_SECRET)}`,
+	`admin = ${q(getEnv('ADMIN'))}`,
+	`jwt_secret = ${q(getEnv('JWT_SECRET'))}`,
 	`ai_model = ${q(aiModel)}`,
 	`analysis_cache = ${q(analysisCache)}`
 );
