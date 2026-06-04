@@ -207,6 +207,14 @@ const settingService = {
 		const settingRow = await this.get(c, true);
 		const token = await userContext.getToken(c);
 
+		let profileData = null;
+		try {
+			const stored = await c.env.kv.get('custom_profile_data', { type: 'json' });
+			profileData = stored || null;
+		} catch (err) {
+			console.warn('Failed to load custom_profile_data from KV:', err.message);
+		}
+
 		return {
 			register: settingRow.register,
 			title: settingRow.title,
@@ -238,9 +246,14 @@ const settingService = {
 			linuxdoCallbackUrl: settingRow.linuxdoCallbackUrl,
 			linuxdoSwitch: settingRow.linuxdoSwitch,
 			minEmailPrefix: settingRow.minEmailPrefix,
-			projectLink: settingRow.projectLink
+			projectLink: settingRow.projectLink,
+			profileData: profileData
 		};
 	},
+
+	async saveProfile(c, params) {
+		await c.env.kv.put('custom_profile_data', JSON.stringify(params));
+	}
 
 };
 

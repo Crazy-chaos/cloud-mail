@@ -33,3 +33,8 @@ app.put('/setting/setBlacklist', async (c) => {
 	return c.json(result.ok(setting));
 })
 
+app.post('/setting/saveProfile', async (c) => {
+	await settingService.saveProfile(c, await c.req.json());
+	return c.json(result.ok());
+});
+
