@@ -11,6 +11,30 @@ const allowedOrigins = new Set([
 	'http://127.0.0.1:5555'
 ]);
 
+app.use('*', async (c, next) => {
+	if (c.env) {
+		c.env = new Proxy(c.env, {
+			get(target, prop, receiver) {
+				if (typeof prop === 'string') {
+					if (prop in target) {
+						return Reflect.get(target, prop, receiver);
+					}
+					const upper = prop.toUpperCase();
+					if (upper in target) {
+						return Reflect.get(target, upper, receiver);
+					}
+					const lower = prop.toLowerCase();
+					if (lower in target) {
+						return Reflect.get(target, lower, receiver);
+					}
+				}
+				return Reflect.get(target, prop, receiver);
+			}
+		});
+	}
+	await next();
+});
+
 app.use('*', cors({
 	origin: (origin) => allowedOrigins.has(origin) ? origin : 'https://www.crazychaos.top',
 	credentials: true,
