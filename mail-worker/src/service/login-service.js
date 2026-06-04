@@ -205,13 +205,14 @@ const loginService = {
 
 	async login(c, params, noVerifyPwd = false) {
 
-		const { email, password } = params;
+		const { email, password, token } = params;
 
 		if ((!email || !password) && !noVerifyPwd) {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
 
 		if (!noVerifyPwd) {
+			await turnstileService.verify(c, token);
 			await this.checkLoginThrottle(c, email);
 		}
 

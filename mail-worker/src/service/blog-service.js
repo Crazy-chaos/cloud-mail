@@ -1,6 +1,9 @@
 import BizError from '../error/biz-error';
 import fileUtils from '../utils/file-utils';
 import permService from './perm-service';
+import jwtUtils from '../utils/jwt-utils';
+import constant from '../const/constant';
+import KvConst from '../const/kv-const';
 
 const TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS blog_post (
@@ -17,7 +20,18 @@ CREATE TABLE IF NOT EXISTS blog_post (
 	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	published_at TEXT,
-	user_id INTEGER DEFAULT 0
+	user_id INTEGER DEFAULT 0,
+	visibility TEXT NOT NULL DEFAULT 'public'
+)`;
+
+const COMMENT_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS blog_comments (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	slug TEXT NOT NULL,
+	email TEXT NOT NULL DEFAULT '',
+	nickname TEXT NOT NULL DEFAULT '',
+	content TEXT NOT NULL DEFAULT '',
+	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 )`;
 
 function bindMaybe(statement, params) {
@@ -27,13 +41,20 @@ function bindMaybe(statement, params) {
 const blogService = {
 	async ensureTables(c) {
 		await c.env.db.prepare(TABLE_SQL).run();
+		await c.env.db.prepare(COMMENT_TABLE_SQL).run();
 		try {
 			await c.env.db.prepare('ALTER TABLE blog_post ADD COLUMN user_id INTEGER DEFAULT 0').run();
 		} catch (e) {
 			// column already exists
 		}
+		try {
+			await c.env.db.prepare("ALTER TABLE blog_post ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'").run();
+		} catch (e) {
+			// column already exists
+		}
 		await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_blog_post_slug ON blog_post(slug)').run();
 		await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_blog_post_status_published ON blog_post(status, published_at)').run();
+		await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_blog_comments_slug_created ON blog_comments(slug, created_at)').run();
 		await this.ensurePerm(c);
 	},
 
@@ -56,6 +77,7 @@ const blogService = {
 
 	async list(c) {
 		await this.ensureTables(c);
+		const currentUser = await this.currentUserOptional(c);
 		const page = Math.max(Number(c.req.query('page') || 1), 1);
 		const pageSize = Math.min(Math.max(Number(c.req.query('pageSize') || 10), 1), 50);
 		const category = c.req.query('category') || '';
@@ -63,37 +85,45 @@ const blogService = {
 		const q = String(c.req.query('q') || '').trim();
 		const offset = (page - 1) * pageSize;
 
-		const filters = ['status = ?'];
+		const filters = ['p.status = ?'];
 		const params = ['published'];
+		if (currentUser?.userId) {
+			filters.push("(p.visibility IN ('public', 'logged_in') OR p.user_id = ?)");
+			params.push(currentUser.userId);
+		} else {
+			filters.push("p.visibility IN ('public', 'logged_in')");
+		}
 
 		if (category) {
-			filters.push('category = ?');
+			filters.push('p.category = ?');
 			params.push(category);
 		}
 
 		if (tag) {
-			filters.push('tags LIKE ?');
+			filters.push('p.tags LIKE ?');
 			params.push(`%"${tag.replaceAll('"', '""')}"%`);
 		}
 
 		if (q) {
-			filters.push('(title LIKE ? OR summary LIKE ? OR category LIKE ? OR tags LIKE ?)');
+			filters.push('(p.title LIKE ? OR p.summary LIKE ? OR p.category LIKE ? OR p.tags LIKE ?)');
 			const keyword = `%${q}%`;
 			params.push(keyword, keyword, keyword, keyword);
 		}
 
 		const where = filters.join(' AND ');
 		const countRow = await c.env.db
-			.prepare(`SELECT COUNT(*) AS total FROM blog_post WHERE ${where}`)
+			.prepare(`SELECT COUNT(*) AS total FROM blog_post p WHERE ${where}`)
 			.bind(...params)
 			.first();
 
 		const rows = await c.env.db
 			.prepare(`
-				SELECT post_id, slug, title, summary, cover_key, category, tags, view_count, created_at, updated_at, published_at
-				FROM blog_post
+				SELECT p.post_id, p.slug, p.title, p.summary, p.cover_key, p.category, p.tags, p.view_count,
+					p.created_at, p.updated_at, p.published_at, p.user_id, p.visibility, u.email AS author_email, u.nickname AS author_nickname
+				FROM blog_post p
+				LEFT JOIN user u ON u.user_id = p.user_id
 				WHERE ${where}
-				ORDER BY COALESCE(published_at, created_at) DESC, post_id DESC
+				ORDER BY COALESCE(p.published_at, p.created_at) DESC, p.post_id DESC
 				LIMIT ? OFFSET ?
 			`)
 			.bind(...params, pageSize, offset)
@@ -119,12 +149,12 @@ const blogService = {
 		const params = [];
 
 		if (status) {
-			filters.push('status = ?');
+			filters.push('p.status = ?');
 			params.push(status);
 		}
 
 		if (q) {
-			filters.push('(title LIKE ? OR summary LIKE ? OR category LIKE ? OR tags LIKE ?)');
+			filters.push('(p.title LIKE ? OR p.summary LIKE ? OR p.category LIKE ? OR p.tags LIKE ?)');
 			const keyword = `%${q}%`;
 			params.push(keyword, keyword, keyword, keyword);
 		}
@@ -135,19 +165,22 @@ const blogService = {
 		const canManageAll = isSuperAdmin || permKeys.includes('blog:manage') || permKeys.includes('*');
 
 		if (!canManageAll && permKeys.includes('blog:manage_own') && user) {
-			filters.push('user_id = ?');
+			filters.push('p.user_id = ?');
 			params.push(user.userId);
 		}
 
 		const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
-		const countStmt = c.env.db.prepare(`SELECT COUNT(*) AS total FROM blog_post ${where}`);
+		const countStmt = c.env.db.prepare(`SELECT COUNT(*) AS total FROM blog_post p ${where}`);
 		const countRow = await bindMaybe(countStmt, params).first();
 
 		const listStmt = c.env.db.prepare(`
-			SELECT post_id, slug, title, summary, cover_key, content_key, category, tags, status, view_count, created_at, updated_at, published_at
-			FROM blog_post
+			SELECT p.post_id, p.slug, p.title, p.summary, p.cover_key, p.content_key, p.category, p.tags, p.status,
+				p.view_count, p.created_at, p.updated_at, p.published_at, p.user_id, p.visibility,
+				u.email AS author_email, u.nickname AS author_nickname
+			FROM blog_post p
+			LEFT JOIN user u ON u.user_id = p.user_id
 			${where}
-			ORDER BY updated_at DESC, post_id DESC
+			ORDER BY p.updated_at DESC, p.post_id DESC
 			LIMIT ? OFFSET ?
 		`);
 		const rows = await listStmt.bind(...params, pageSize, offset).all();
@@ -166,11 +199,15 @@ const blogService = {
 
 	async detail(c, slug) {
 		await this.ensureTables(c);
+		const currentUser = await this.currentUserOptional(c);
 		const row = await c.env.db
 			.prepare(`
-				SELECT post_id, slug, title, summary, cover_key, content_key, category, tags, status, view_count, created_at, updated_at, published_at
-				FROM blog_post
-				WHERE slug = ? AND status = 'published'
+				SELECT p.post_id, p.slug, p.title, p.summary, p.cover_key, p.content_key, p.category, p.tags, p.status,
+					p.view_count, p.created_at, p.updated_at, p.published_at, p.user_id, p.visibility,
+					u.email AS author_email, u.nickname AS author_nickname
+				FROM blog_post p
+				LEFT JOIN user u ON u.user_id = p.user_id
+				WHERE p.slug = ? AND p.status = 'published'
 			`)
 			.bind(slug)
 			.first();
@@ -179,12 +216,26 @@ const blogService = {
 			throw new BizError('Post not found', 404);
 		}
 
+		const visibility = row.visibility || 'public';
+		const isOwner = currentUser?.userId && row.user_id === currentUser.userId;
+		if (visibility === 'private' && !isOwner) {
+			throw new BizError('Permission denied to view this blog post', 403);
+		}
+
 		await c.env.db
 			.prepare('UPDATE blog_post SET view_count = view_count + 1 WHERE post_id = ?')
 			.bind(row.post_id)
 			.run();
 
 		row.view_count += 1;
+		if (visibility === 'logged_in' && !currentUser) {
+			return {
+				...this.toPublicPost(c, row),
+				content: '该文章内容已加密，请登录后查看',
+				contentKey: '',
+				locked: true
+			};
+		}
 		return {
 			...this.toPublicPost(c, row),
 			content: await this.readContent(c, row.content_key),
@@ -198,7 +249,7 @@ const blogService = {
 			.prepare(`
 				SELECT slug, title, summary, category, tags, view_count, created_at, updated_at, published_at
 				FROM blog_post
-				WHERE status = 'published'
+				WHERE status = 'published' AND visibility = 'public'
 				ORDER BY COALESCE(published_at, created_at) DESC, post_id DESC
 				LIMIT 30
 			`)
@@ -275,6 +326,7 @@ const blogService = {
 		}
 
 		const status = payload.status === 'published' ? 'published' : 'draft';
+		const visibility = this.cleanVisibility(payload.visibility);
 		const now = new Date().toISOString();
 		const publishedAt = status === 'published'
 			? (payload.publishedAt || payload.published_at || now)
@@ -285,8 +337,8 @@ const blogService = {
 
 		await c.env.db
 			.prepare(`
-				INSERT INTO blog_post (slug, title, summary, cover_key, content_key, category, tags, status, created_at, updated_at, published_at, user_id)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				INSERT INTO blog_post (slug, title, summary, cover_key, content_key, category, tags, status, created_at, updated_at, published_at, user_id, visibility)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				ON CONFLICT(slug) DO UPDATE SET
 					title = excluded.title,
 					summary = excluded.summary,
@@ -296,7 +348,8 @@ const blogService = {
 					tags = excluded.tags,
 					status = excluded.status,
 					updated_at = excluded.updated_at,
-					published_at = excluded.published_at
+					published_at = excluded.published_at,
+					visibility = excluded.visibility
 			`)
 			.bind(
 				slug,
@@ -310,7 +363,8 @@ const blogService = {
 				now,
 				now,
 				publishedAt,
-				user?.userId || 0
+				user?.userId || 0,
+				visibility
 			)
 			.run();
 
@@ -357,9 +411,12 @@ const blogService = {
 		await this.assertCanManage(c);
 		const row = await c.env.db
 			.prepare(`
-				SELECT post_id, slug, title, summary, cover_key, content_key, category, tags, status, view_count, created_at, updated_at, published_at, user_id
-				FROM blog_post
-				WHERE slug = ?
+				SELECT p.post_id, p.slug, p.title, p.summary, p.cover_key, p.content_key, p.category, p.tags, p.status,
+					p.view_count, p.created_at, p.updated_at, p.published_at, p.user_id, p.visibility,
+					u.email AS author_email, u.nickname AS author_nickname
+				FROM blog_post p
+				LEFT JOIN user u ON u.user_id = p.user_id
+				WHERE p.slug = ?
 			`)
 			.bind(slug)
 			.first();
@@ -408,6 +465,72 @@ const blogService = {
 		}
 	},
 
+	async comments(c, slug) {
+		await this.ensureTables(c);
+		const rows = await c.env.db
+			.prepare(`
+				SELECT id, slug, email, nickname, content, created_at
+				FROM blog_comments
+				WHERE slug = ?
+				ORDER BY created_at ASC, id ASC
+			`)
+			.bind(slug)
+			.all();
+
+		return (rows.results || []).map(row => ({
+			id: row.id,
+			slug: row.slug,
+			email: row.email,
+			nickname: row.nickname || row.email.split('@')[0],
+			content: row.content,
+			createdAt: row.created_at
+		}));
+	},
+
+	async addComment(c, slug, payload) {
+		await this.ensureTables(c);
+		const user = c.get('user');
+		if (!user) {
+			throw new BizError('Login required', 401);
+		}
+
+		const content = String(payload.content || '').trim();
+		if (!content) {
+			throw new BizError('Comment content is required', 400);
+		}
+		if (content.length > 1000) {
+			throw new BizError('Comment content cannot exceed 1000 characters', 400);
+		}
+
+		const post = await c.env.db
+			.prepare("SELECT slug FROM blog_post WHERE slug = ? AND status = 'published'")
+			.bind(slug)
+			.first();
+		if (!post) {
+			throw new BizError('Post not found', 404);
+		}
+
+		const now = new Date().toISOString();
+		const nickname = user.nickname || user.name || user.email.split('@')[0];
+		const result = await c.env.db
+			.prepare(`
+				INSERT INTO blog_comments (slug, email, nickname, content, created_at)
+				VALUES (?, ?, ?, ?, ?)
+				RETURNING id, slug, email, nickname, content, created_at
+			`)
+			.bind(slug, user.email, nickname, content, now)
+			.first();
+
+		return {
+			id: result.id,
+			slug: result.slug,
+			email: result.email,
+			nickname: result.nickname,
+			content: result.content,
+			createdAt: result.created_at
+		};
+	},
+
 	async readContent(c, key) {
 		if (!key) return '';
 		const obj = await this.getBlogObject(c, key);
@@ -439,6 +562,8 @@ const blogService = {
 	},
 
 	toPublicPost(c, row) {
+		const authorEmail = row.author_email || '';
+		const authorNickname = row.author_nickname || (authorEmail ? authorEmail.split('@')[0] : '');
 		return {
 			postId: row.post_id,
 			slug: row.slug,
@@ -451,7 +576,12 @@ const blogService = {
 			viewCount: row.view_count || 0,
 			createdAt: row.created_at,
 			updatedAt: row.updated_at,
-			publishedAt: row.published_at
+			publishedAt: row.published_at,
+			visibility: row.visibility || 'public',
+			author: {
+				email: authorEmail,
+				nickname: authorNickname
+			}
 		};
 	},
 
@@ -478,6 +608,10 @@ const blogService = {
 			return JSON.stringify(tags.split(',').map(tag => tag.trim()).filter(Boolean));
 		}
 		return '[]';
+	},
+
+	cleanVisibility(value) {
+		return ['public', 'logged_in', 'private'].includes(value) ? value : 'public';
 	},
 
 	cleanSlug(slug) {
@@ -519,6 +653,35 @@ const blogService = {
 			.replaceAll('>', '&gt;')
 			.replaceAll('"', '&quot;')
 			.replaceAll("'", '&apos;');
+	},
+
+	async currentUserOptional(c) {
+		const cached = c.get('user');
+		if (cached) return cached;
+
+		const headerToken = c.req.header(constant.TOKEN_HEADER);
+		const jwt = (headerToken && headerToken !== 'null' && headerToken !== 'undefined')
+			? headerToken
+			: this.getCookie(c, constant.TOKEN_COOKIE);
+
+		if (!jwt) return null;
+		const verifyResult = await jwtUtils.verifyToken(c, jwt);
+		if (!verifyResult) return null;
+
+		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + verifyResult.userId, { type: 'json' });
+		if (!authInfo || !authInfo.tokens.includes(verifyResult.token)) {
+			return null;
+		}
+		return authInfo.user || null;
+	},
+
+	getCookie(c, name) {
+		const cookie = c.req.header('Cookie') || '';
+		const item = cookie
+			.split(';')
+			.map(value => value.trim())
+			.find(value => value.startsWith(`${name}=`));
+		return item ? decodeURIComponent(item.slice(name.length + 1)) : '';
 	},
 
 	async assertCanManage(c) {

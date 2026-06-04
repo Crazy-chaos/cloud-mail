@@ -43,6 +43,26 @@ const dbInit = {
 			console.warn(`跳过增加 blog_post.user_id 字段：${e.message}`);
 		}
 		try {
+			await c.env.db.prepare(`ALTER TABLE blog_post ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public';`).run();
+		} catch (e) {
+			console.warn(`跳过增加 blog_post.visibility 字段：${e.message}`);
+		}
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS blog_comments (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					slug TEXT NOT NULL,
+					email TEXT NOT NULL DEFAULT '',
+					nickname TEXT NOT NULL DEFAULT '',
+					content TEXT NOT NULL DEFAULT '',
+					created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_blog_comments_slug_created ON blog_comments(slug, created_at)').run();
+		} catch (e) {
+			console.warn(`跳过初始化 blog_comments 表：${e.message}`);
+		}
+		try {
 			await c.env.db.prepare(`
 				INSERT INTO perm (name, perm_key, pid, type, sort)
 				SELECT '管理自己博客', 'blog:manage_own', 17, 2, 9

@@ -11,6 +11,11 @@ const turnstileService = {
 		}
 
 		const settingRow = await settingService.query(c)
+		const secretKey = c.env.turnstile_secret_key || c.env.TURNSTILE_SECRET_KEY || settingRow.secretKey;
+
+		if (!secretKey) {
+			throw new BizError(t('addTurnstileSecret'), 400);
+		}
 
 		const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
 			method: 'POST',
@@ -18,7 +23,7 @@ const turnstileService = {
 				'Content-Type': 'application/x-www-form-urlencoded'
 			},
 			body: new URLSearchParams({
-				secret: settingRow.secretKey,
+				secret: secretKey,
 				response: token,
 				remoteip: c.req.header('cf-connecting-ip')
 			})

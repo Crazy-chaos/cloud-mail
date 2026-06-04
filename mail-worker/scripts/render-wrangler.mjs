@@ -24,6 +24,8 @@ const linuxdoClientId = process.env.LINUXDO_CLIENT_ID || '';
 const linuxdoClientSecret = process.env.LINUXDO_CLIENT_SECRET || '';
 const linuxdoCallbackUrl = process.env.LINUXDO_CALLBACK_URL || '';
 const linuxdoSwitch = process.env.LINUXDO_SWITCH || '';
+const turnstileSiteKey = process.env.TURNSTILE_SITE_KEY || process.env.turnstile_site_key || '';
+const turnstileSecretKey = process.env.TURNSTILE_SECRET_KEY || process.env.turnstile_secret_key || '';
 const cfEmail = String(process.env.CF_EMAIL || process.env.CLOUDFLARE_EMAIL || '').toLowerCase() === 'true';
 
 function q(value) {
@@ -93,6 +95,8 @@ lines.push(
 );
 
 if (projectLink) lines.push(`project_link = ${q(projectLink)}`);
+if (turnstileSiteKey) lines.push(`turnstile_site_key = ${q(turnstileSiteKey)}`);
+if (turnstileSecretKey) lines.push(`turnstile_secret_key = ${q(turnstileSecretKey)}`);
 if (linuxdoClientId && linuxdoClientSecret) {
 	lines.push(
 		`linuxdo_client_id = ${q(linuxdoClientId)}`,

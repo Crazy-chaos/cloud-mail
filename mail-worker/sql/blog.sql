@@ -14,11 +14,23 @@ CREATE TABLE IF NOT EXISTS blog_post (
 	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	published_at TEXT,
-	user_id INTEGER DEFAULT 0
+	user_id INTEGER DEFAULT 0,
+	visibility TEXT NOT NULL DEFAULT 'public'
 );
 
 CREATE INDEX IF NOT EXISTS idx_blog_post_slug ON blog_post(slug);
 CREATE INDEX IF NOT EXISTS idx_blog_post_status_published ON blog_post(status, published_at);
+
+CREATE TABLE IF NOT EXISTS blog_comments (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	slug TEXT NOT NULL,
+	email TEXT NOT NULL DEFAULT '',
+	nickname TEXT NOT NULL DEFAULT '',
+	content TEXT NOT NULL DEFAULT '',
+	created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_blog_comments_slug_created ON blog_comments(slug, created_at);
 
 INSERT INTO perm (name, perm_key, pid, type, sort)
 SELECT '博客管理', 'blog:manage', 17, 2, 8

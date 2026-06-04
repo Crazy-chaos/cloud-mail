@@ -45,8 +45,9 @@
           <el-table-column show-overflow-tooltip :tooltip-formatter="tableRowFormatter" :label="$t('tabEmailAddress')"
                            :min-width="emailWidth">
             <template #default="props">
-              <div style="display: flex;gap: 5px">
+              <div class="user-identity">
                 <div class="email-row">{{ props.row.email }}</div>
+                <div v-if="props.row.nickname" class="nickname-row">{{ props.row.nickname }}</div>
                 <el-tag type="warning" v-if="props.row.username">L</el-tag>
               </div>
             </template>
@@ -234,6 +235,7 @@
                     等级：<el-tag type="success">{{userDetails.trustLevel}}</el-tag>
                   </span>
         </div>
+        <div><span class="details-item-title">昵称:</span>{{ userDetails.nickname || '未设置' }}</div>
         <div v-if="!sendNumShow"><span
             class="details-item-title">{{ $t('tabSent') }}:</span>{{ userDetails.sendEmailCount }}
         </div>
@@ -1182,6 +1184,24 @@ function adjustWidth() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.user-identity {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 6px;
+  align-items: center;
+}
+
+.nickname-row {
+  grid-column: 1 / -1;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-select {

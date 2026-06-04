@@ -41,6 +41,15 @@
           </el-input>
           <el-input v-model="form.password" :placeholder="$t('password')" type="password" autocomplete="off">
           </el-input>
+          <div
+              v-show="loginVerifyShow"
+              class="login-turnstile"
+              :data-sitekey="settingStore.settings.siteKey"
+              data-callback="onLoginTurnstileSuccess"
+              data-error-callback="onLoginTurnstileError"
+          >
+            <span style="font-size: 12px;color: #F56C6C" v-if="loginBotJsError">人机验证加载失败</span>
+          </div>
           <el-button class="btn" type="primary" @click="submit" :loading="loginLoading"
           >{{ $t('loginBtn') }}
           </el-button>
@@ -203,9 +212,41 @@ let verifyToken = ''
 let turnstileId = null
 let botJsError = ref(false)
 let verifyErrorCount = 0
+let loginVerifyToken = ''
+let loginTurnstileId = null
+let pendingLogin = false
+const loginVerifyShow = ref(false)
+const loginBotJsError = ref(false)
+let loginVerifyErrorCount = 0
 
 window.onTurnstileSuccess = (token) => {
   verifyToken = token;
+};
+
+window.onLoginTurnstileSuccess = (token) => {
+  loginVerifyToken = token;
+  if (pendingLogin) {
+    pendingLogin = false;
+    submit();
+  }
+};
+
+window.onLoginTurnstileError = (e) => {
+  if (loginVerifyErrorCount >= 4) {
+    loginBotJsError.value = true
+    return
+  }
+  loginVerifyErrorCount++
+  console.warn('登录人机验证加载失败', e)
+  setTimeout(() => {
+    nextTick(() => {
+      if (!loginTurnstileId) {
+        loginTurnstileId = window.turnstile.render('.login-turnstile')
+      } else {
+        window.turnstile.reset(loginTurnstileId);
+      }
+    })
+  }, 1500)
 };
 
 window.onTurnstileError = (e) => {
@@ -407,10 +448,33 @@ const submit = () => {
     return
   }
 
+  if (!loginVerifyToken) {
+    loginVerifyShow.value = true
+    pendingLogin = true
+    nextTick(() => {
+      if (!loginTurnstileId) {
+        try {
+          loginTurnstileId = window.turnstile.render('.login-turnstile')
+        } catch (e) {
+          loginBotJsError.value = true
+          console.log('登录人机验证js加载失败')
+        }
+      } else {
+        window.turnstile.reset(loginTurnstileId)
+      }
+    })
+    return
+  }
+
   loginLoading.value = true
-  login(email, form.password).then(async data => {
+  login(email, form.password, loginVerifyToken).then(async data => {
     await saveToken(data.token)
   }).finally(() => {
+    loginVerifyToken = ''
+    pendingLogin = false
+    if (loginTurnstileId && window.turnstile) {
+      window.turnstile.reset(loginTurnstileId)
+    }
     loginLoading.value = false
   })
 }
@@ -748,6 +812,10 @@ function submitRegister() {
 }
 
 .register-turnstile {
+  margin-bottom: 18px;
+}
+
+.login-turnstile {
   margin-bottom: 18px;
 }
 

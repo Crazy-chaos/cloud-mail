@@ -49,7 +49,11 @@
             <el-tag :type="post.status === 'published' ? 'success' : 'info'" size="small">
               {{ post.status === 'published' ? '已发布' : '草稿' }}
             </el-tag>
+            <el-tag size="small" effect="plain">{{ visibilityName(post.visibility) }}</el-tag>
             <span>{{ formatDate(post.updatedAt) }}</span>
+          </div>
+          <div v-if="post.author?.email" class="post-author">
+            {{ post.author.nickname || post.author.email }} · {{ post.author.email }}
           </div>
         </button>
         <div v-if="!loading && posts.length === 0" class="state">还没有文章</div>
@@ -69,7 +73,7 @@
             </div>
           </div>
 
-          <div class="form-row two">
+          <div class="form-row three">
             <el-form-item label="Slug">
               <el-input v-model="form.slug" placeholder="my-first-post" :disabled="Boolean(loadedSlug)" />
             </el-form-item>
@@ -77,6 +81,13 @@
               <el-select v-model="form.status">
                 <el-option label="草稿" value="draft" />
                 <el-option label="发布" value="published" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="可见度">
+              <el-select v-model="form.visibility">
+                <el-option label="所有人可见" value="public" />
+                <el-option label="仅登录后可见" value="logged_in" />
+                <el-option label="仅自己可见" value="private" />
               </el-select>
             </el-form-item>
           </div>
@@ -110,7 +121,15 @@
           </el-form-item>
 
           <el-form-item label="正文 Markdown">
+            <div class="markdown-toolbar">
+              <el-button round :loading="uploadingImage" @click="chooseMarkdownImage">
+                <Icon icon="ion:image-outline" width="18" height="18" />
+                插入图片
+              </el-button>
+              <span>支持 Markdown 图片语法：![描述](图片地址)</span>
+            </div>
             <el-input
+                ref="contentInputRef"
                 v-model="form.content"
                 class="content-input"
                 type="textarea"
@@ -151,7 +170,8 @@ const emptyForm = () => ({
   tags: [],
   coverKey: '',
   content: '',
-  status: 'draft'
+  status: 'draft',
+  visibility: 'public'
 });
 
 const posts = reactive([]);
@@ -160,8 +180,10 @@ const tagText = ref('');
 const loading = ref(false);
 const saving = ref(false);
 const uploadingCover = ref(false);
+const uploadingImage = ref(false);
 const coverPreview = ref('');
 const loadedSlug = ref('');
+const contentInputRef = ref(null);
 
 getList();
 
@@ -198,9 +220,68 @@ function selectPost(post) {
       tags: data.tags || [],
       coverKey: data.coverKey || '',
       content: data.content || '',
-      status: data.status || 'draft'
+      status: data.status || 'draft',
+      visibility: data.visibility || 'public'
     });
     coverPreview.value = data.coverUrl || '';
+  });
+}
+
+function chooseMarkdownImage() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/webp,image/gif,image/avif';
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    await uploadMarkdownImage(file);
+  };
+  input.click();
+}
+
+async function uploadMarkdownImage(file) {
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件');
+    return;
+  }
+
+  uploadingImage.value = true;
+  try {
+    const image = await compressImage(file, {
+      convertSize: 900 * 1024,
+      quality: 0.9
+    });
+    const content = await fileToBase64(image, true);
+    const data = await blogUploadCover({
+      filename: image.name || file.name,
+      contentType: image.type || file.type,
+      content
+    });
+    insertAtCursor(`![${file.name.replace(/\.[^.]+$/, '')}](${data.url})`);
+    ElMessage.success('图片已插入正文');
+  } finally {
+    uploadingImage.value = false;
+  }
+}
+
+function insertAtCursor(text) {
+  const textarea = contentInputRef.value?.textarea || contentInputRef.value?.$el?.querySelector('textarea');
+  if (!textarea) {
+    form.content = `${form.content || ''}\n\n${text}\n`;
+    return;
+  }
+
+  const start = textarea.selectionStart ?? form.content.length;
+  const end = textarea.selectionEnd ?? form.content.length;
+  const before = form.content.slice(0, start);
+  const after = form.content.slice(end);
+  const prefix = before && !before.endsWith('\n') ? '\n\n' : '';
+  const suffix = after && !after.startsWith('\n') ? '\n\n' : '\n';
+  form.content = `${before}${prefix}${text}${suffix}${after}`;
+  requestAnimationFrame(() => {
+    textarea.focus();
+    const cursor = start + prefix.length + text.length + suffix.length;
+    textarea.setSelectionRange(cursor, cursor);
   });
 }
 
@@ -259,7 +340,8 @@ function savePost() {
           coverKey: data.coverKey || '',
           coverUrl: data.coverUrl || '',
           content: data.content || '',
-          status: data.status || form.status
+          status: data.status || form.status,
+          visibility: data.visibility || form.visibility
         });
         getList();
       })
@@ -292,6 +374,15 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString('zh-CN', {month: '2-digit', day: '2-digit'});
+}
+
+function visibilityName(value) {
+  const map = {
+    public: '所有人',
+    logged_in: '登录可见',
+    private: '仅自己'
+  };
+  return map[value] || map.public;
 }
 </script>
 
@@ -403,8 +494,18 @@ function formatDate(value) {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+.post-author {
+  margin-top: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .editor {
@@ -437,6 +538,21 @@ function formatDate(value) {
   &.two {
     grid-template-columns: 1fr 1fr;
   }
+
+  &.three {
+    grid-template-columns: 1fr 150px 190px;
+  }
+}
+
+.markdown-toolbar {
+  width: 100%;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  flex-wrap: wrap;
 }
 
 .content-input {
@@ -513,7 +629,8 @@ function formatDate(value) {
   }
 
   .editor-head,
-  .form-row.two {
+  .form-row.two,
+  .form-row.three {
     grid-template-columns: 1fr;
     flex-direction: column;
   }

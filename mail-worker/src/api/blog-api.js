@@ -22,6 +22,16 @@ app.get('/blog/rss', async (c) => {
 	});
 });
 
+app.get('/blog/comment/:slug', async (c) => {
+	const data = await blogService.comments(c, c.req.param('slug'));
+	return c.json(result.ok(data));
+});
+
+app.post('/blog/comment/:slug', async (c) => {
+	const data = await blogService.addComment(c, c.req.param('slug'), await c.req.json());
+	return c.json(result.ok(data));
+});
+
 app.get('/blog/admin/list', async (c) => {
 	const data = await blogService.adminList(c);
 	return c.json(result.ok(data));

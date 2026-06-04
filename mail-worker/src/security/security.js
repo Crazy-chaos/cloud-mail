@@ -100,6 +100,9 @@ const premKey = {
 app.use('*', async (c, next) => {
 
 	const path = c.req.path;
+	if (c.req.method === 'GET' && path.startsWith('/blog/comment')) {
+		return await next();
+	}
 
 	const index = exclude.findIndex(item => {
 		return path.startsWith(item);
