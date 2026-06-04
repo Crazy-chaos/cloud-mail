@@ -33,6 +33,7 @@ const dbInit = {
 		await this.v3_2DB(c);
 		await this.v3_3DB(c);
 		await this.v3_4DB(c);
+		await this.v3_5DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -136,6 +137,18 @@ const dbInit = {
 			`).run();
 		} catch (e) {
 			console.warn(`跳过增加 tools:manage 权限：${e.message}`);
+		}
+	},
+
+	async v3_5DB(c) {
+		try {
+			await c.env.db.prepare(`
+				INSERT INTO perm (name, perm_key, pid, type, sort)
+				SELECT '管理自己资源', 'tools:manage_own', 17, 2, 11
+				WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'tools:manage_own')
+			`).run();
+		} catch (e) {
+			console.warn(`跳过增加 tools:manage_own 权限：${e.message}`);
 		}
 	},
 

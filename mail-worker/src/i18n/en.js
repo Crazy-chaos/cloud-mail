@@ -101,6 +101,9 @@ const en = {
 		"设置查看": "View Settings",
 		"设置修改": "Change Settings",
 		"博客管理": "Blog Management",
+		"管理自己博客": "Manage Own Blog",
+		"资源管理": "Resource Management",
+		"管理自己资源": "Manage Own Resources",
 		"发件重置": "Reset Send Count"
 	}
 };
