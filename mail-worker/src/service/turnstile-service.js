@@ -11,7 +11,7 @@ const turnstileService = {
 		}
 
 		const settingRow = await settingService.query(c)
-		const secretKey = c.env.turnstile_secret_key || c.env.TURNSTILE_SECRET_KEY || settingRow.secretKey;
+		const secretKey = c.env.turnstile_secret_key || settingRow.secretKey;
 
 		if (!secretKey) {
 			throw new BizError(t('addTurnstileSecret'), 400);

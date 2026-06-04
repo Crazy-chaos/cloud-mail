@@ -217,7 +217,7 @@ const settingService = {
 			registerVerify: settingRow.registerVerify,
 			send: settingRow.send,
 			r2Domain: settingRow.r2Domain,
-			siteKey: c.env.turnstile_site_key || c.env.TURNSTILE_SITE_KEY || settingRow.siteKey,
+			siteKey: c.env.turnstile_site_key || settingRow.siteKey,
 			background: settingRow.background,
 			loginOpacity: settingRow.loginOpacity,
 			loginDarkenFactor: settingRow.loginDarkenFactor,
