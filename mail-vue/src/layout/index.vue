@@ -157,8 +157,8 @@ onBeforeUnmount(() => {
   }
 
   .main-container {
-    height: calc(var(--app-height) - 30px - env(safe-area-inset-top));
-    margin: calc(22px + env(safe-area-inset-top)) 12px 8px;
+    height: calc(var(--app-height) - 30px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    margin: calc(22px + env(safe-area-inset-top)) 12px calc(8px + env(safe-area-inset-bottom));
     border-radius: 18px;
   }
 
@@ -175,7 +175,7 @@ onBeforeUnmount(() => {
   .aside-show,
   .el-aside-hide {
     top: env(safe-area-inset-top);
-    height: calc(var(--app-height) - env(safe-area-inset-top));
+    height: calc(var(--app-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 
   .overlay-show {

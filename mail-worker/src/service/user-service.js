@@ -210,6 +210,7 @@ const userService = {
 		for (const user of list) {
 
 			const userId = user.userId;
+			user.displayNickname = user.nickname || user.name || user.username || user.email.split('@')[0];
 
 			user.receiveEmailCount = receiveMap[userId] || 0;
 			user.sendEmailCount = sendMap[userId] || 0;

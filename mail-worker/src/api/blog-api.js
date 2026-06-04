@@ -2,6 +2,29 @@ import app from '../hono/hono';
 import result from '../model/result';
 import blogService from '../service/blog-service';
 
+async function readJsonBody(c) {
+	const raw = (await c.req.text()).trim();
+	if (!raw) return {};
+
+	const candidates = [raw];
+	if (raw.startsWith('null')) {
+		const rest = raw.slice(4).trim();
+		if (rest.startsWith('{') || rest.startsWith('[')) {
+			candidates.push(rest);
+		}
+	}
+
+	for (const candidate of candidates) {
+		try {
+			return JSON.parse(candidate);
+		} catch {
+			// try next candidate
+		}
+	}
+
+	return { content: raw };
+}
+
 app.get('/blog/list', async (c) => {
 	const data = await blogService.list(c);
 	return c.json(result.ok(data));
@@ -28,7 +51,7 @@ app.get('/blog/comment/:slug', async (c) => {
 });
 
 app.post('/blog/comment/:slug', async (c) => {
-	const data = await blogService.addComment(c, c.req.param('slug'), await c.req.json());
+	const data = await blogService.addComment(c, c.req.param('slug'), await readJsonBody(c));
 	return c.json(result.ok(data));
 });
 

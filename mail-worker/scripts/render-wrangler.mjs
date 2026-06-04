@@ -1,4 +1,29 @@
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, existsSync, readFileSync } from 'node:fs';
+
+// Try to load env variables from a local .env file if it exists (for local development)
+if (existsSync('.env')) {
+	try {
+		const envContent = readFileSync('.env', 'utf-8');
+		envContent.split(/\r?\n/).forEach((line) => {
+			const trimmed = line.trim();
+			if (!trimmed || trimmed.startsWith('#')) return;
+			const equalIndex = trimmed.indexOf('=');
+			if (equalIndex === -1) return;
+			const key = trimmed.substring(0, equalIndex).trim();
+			let value = trimmed.substring(equalIndex + 1).trim();
+			// Remove surrounding quotes if present
+			if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+				value = value.slice(1, -1);
+			}
+			if (!process.env[key]) {
+				process.env[key] = value;
+			}
+		});
+		console.log('Loaded environment variables from local .env file');
+	} catch (err) {
+		console.warn('Failed to parse local .env file:', err);
+	}
+}
 
 const required = [
 	'ADMIN',

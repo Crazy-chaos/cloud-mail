@@ -47,9 +47,14 @@
             <template #default="props">
               <div class="user-identity">
                 <div class="email-row">{{ props.row.email }}</div>
-                <div v-if="props.row.nickname" class="nickname-row">{{ props.row.nickname }}</div>
+                <div v-if="displayNickname(props.row)" class="nickname-row">{{ displayNickname(props.row) }}</div>
                 <el-tag type="warning" v-if="props.row.username">L</el-tag>
               </div>
+            </template>
+          </el-table-column>
+          <el-table-column show-overflow-tooltip label="昵称" min-width="120">
+            <template #default="props">
+              <span class="nickname-cell">{{ displayNickname(props.row) }}</span>
             </template>
           </el-table-column>
           <el-table-column :formatter="formatterReceive" label-class-name="receive" column-key="receive"
@@ -235,7 +240,7 @@
                     等级：<el-tag type="success">{{userDetails.trustLevel}}</el-tag>
                   </span>
         </div>
-        <div><span class="details-item-title">昵称:</span>{{ userDetails.nickname || '未设置' }}</div>
+        <div><span class="details-item-title">昵称:</span>{{ displayNickname(userDetails) }}</div>
         <div v-if="!sendNumShow"><span
             class="details-item-title">{{ $t('tabSent') }}:</span>{{ userDetails.sendEmailCount }}
         </div>
@@ -675,7 +680,12 @@ function setRightStatusName(user) {
 }
 
 const tableRowFormatter = (data) => {
-  return data.row.email
+  const nickname = displayNickname(data.row)
+  return nickname ? `${data.row.email}\n${nickname}` : data.row.email
+}
+
+function displayNickname(user) {
+  return user?.displayNickname || user?.nickname || user?.name || user?.username || user?.email?.split('@')[0] || ''
 }
 
 const openSelect = () => {
@@ -1202,6 +1212,15 @@ function adjustWidth() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.nickname-cell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--el-text-color-primary);
 }
 
 .status-select {
