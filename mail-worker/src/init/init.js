@@ -32,8 +32,111 @@ const dbInit = {
 		await this.v3_1DB(c);
 		await this.v3_2DB(c);
 		await this.v3_3DB(c);
+		await this.v3_4DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_4DB(c) {
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS categories (
+					id TEXT PRIMARY KEY,
+					name TEXT NOT NULL,
+					icon TEXT,
+					sort_order INTEGER DEFAULT 0
+				)
+			`).run();
+			await c.env.db.prepare(`
+				INSERT INTO categories (id, name, icon, sort_order) VALUES
+				('web-tools', '网页工具', '🌐', 1),
+				('software', '软件资源', '💻', 2),
+				('downloads', '下载资源', '📥', 3),
+				('links', '外链资源', '🔗', 4),
+				('course-files', '教程配套', '📚', 5)
+				ON CONFLICT(id) DO NOTHING
+			`).run();
+		} catch (e) {
+			console.warn(`跳过初始化 categories 表：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS tags (
+					id TEXT PRIMARY KEY,
+					name TEXT NOT NULL UNIQUE
+				)
+			`).run();
+		} catch (e) {
+			console.warn(`跳过初始化 tags 表：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS tools (
+					id TEXT PRIMARY KEY,
+					title TEXT NOT NULL,
+					slug TEXT NOT NULL UNIQUE,
+					description TEXT DEFAULT '',
+					type TEXT NOT NULL,
+					cover_url TEXT DEFAULT '',
+					content_url TEXT DEFAULT '',
+					download_url TEXT DEFAULT '',
+					version TEXT DEFAULT '',
+					changelog TEXT DEFAULT '',
+					category_id TEXT,
+					visibility TEXT NOT NULL DEFAULT 'public',
+					required_role TEXT DEFAULT '',
+					is_featured INTEGER DEFAULT 0,
+					is_pinned INTEGER DEFAULT 0,
+					view_count INTEGER DEFAULT 0,
+					download_count INTEGER DEFAULT 0,
+					status TEXT NOT NULL DEFAULT 'published',
+					created_by TEXT,
+					created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+					updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+				)
+			`).run();
+			await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_tools_slug ON tools(slug)').run();
+			await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_tools_category ON tools(category_id)').run();
+			await c.env.db.prepare('CREATE INDEX IF NOT EXISTS idx_tools_status ON tools(status)').run();
+		} catch (e) {
+			console.warn(`跳过初始化 tools 表：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS tool_tags (
+					tool_id TEXT NOT NULL,
+					tag_id TEXT NOT NULL,
+					PRIMARY KEY (tool_id, tag_id)
+				)
+			`).run();
+		} catch (e) {
+			console.warn(`跳过初始化 tool_tags 表：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS tool_blog_links (
+					tool_id TEXT NOT NULL,
+					blog_id TEXT NOT NULL,
+					PRIMARY KEY (tool_id, blog_id)
+				)
+			`).run();
+		} catch (e) {
+			console.warn(`跳过初始化 tool_blog_links 表：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`
+				INSERT INTO perm (name, perm_key, pid, type, sort)
+				SELECT '资源管理', 'tools:manage', 17, 2, 10
+				WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'tools:manage')
+			`).run();
+		} catch (e) {
+			console.warn(`跳过增加 tools:manage 权限：${e.message}`);
+		}
 	},
 
 	async v3_3DB(c) {

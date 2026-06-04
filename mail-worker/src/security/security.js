@@ -5,7 +5,7 @@ import KvConst from '../const/kv-const';
 import dayjs from 'dayjs';
 import userService from '../service/user-service';
 import permService from '../service/perm-service';
-import { t } from '../i18n/i18n'
+import { t } from '../i18n/i18n';
 import app from '../hono/hono';
 
 const exclude = [
@@ -21,7 +21,8 @@ const exclude = [
 	'/oauth',
 	'/blog/list',
 	'/blog/detail',
-	'/blog/rss'
+	'/blog/rss',
+	'/tools'
 ];
 
 const requirePerms = [
@@ -64,7 +65,10 @@ const requirePerms = [
 	'/regKey/history',
 	'/blog/post',
 	'/blog/admin',
-	'/blog/upload'
+	'/blog/upload',
+	'/admin/tools',
+	'/admin/categories',
+	'/admin/tags'
 ];
 
 const premKey = {
@@ -95,6 +99,7 @@ const premKey = {
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 	'blog:manage': ['/blog/post', '/blog/admin', '/blog/upload'],
 	'blog:manage_own': ['/blog/post', '/blog/admin', '/blog/upload'],
+	'tools:manage': ['/admin/tools', '/admin/categories', '/admin/tags']
 };
 
 app.use('*', async (c, next) => {

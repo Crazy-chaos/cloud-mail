@@ -4,6 +4,7 @@ import permService from './perm-service';
 import jwtUtils from '../utils/jwt-utils';
 import constant from '../const/constant';
 import KvConst from '../const/kv-const';
+import toolService from './tool-service';
 
 const TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS blog_post (
@@ -49,6 +50,11 @@ const blogService = {
 		}
 		try {
 			await c.env.db.prepare("ALTER TABLE blog_post ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'").run();
+		} catch (e) {
+			// column already exists
+		}
+		try {
+			await c.env.db.prepare("ALTER TABLE blog_post ADD COLUMN comment_count INTEGER DEFAULT 0").run();
 		} catch (e) {
 			// column already exists
 		}
@@ -119,7 +125,8 @@ const blogService = {
 		const rows = await c.env.db
 			.prepare(`
 				SELECT p.post_id, p.slug, p.title, p.summary, p.cover_key, p.category, p.tags, p.view_count,
-					p.created_at, p.updated_at, p.published_at, p.user_id, p.visibility, u.email AS author_email, u.nickname AS author_nickname
+					p.created_at, p.updated_at, p.published_at, p.user_id, p.visibility, u.email AS author_email, u.nickname AS author_nickname,
+					p.comment_count
 				FROM blog_post p
 				LEFT JOIN user u ON u.user_id = p.user_id
 				WHERE ${where}
@@ -176,7 +183,7 @@ const blogService = {
 		const listStmt = c.env.db.prepare(`
 			SELECT p.post_id, p.slug, p.title, p.summary, p.cover_key, p.content_key, p.category, p.tags, p.status,
 				p.view_count, p.created_at, p.updated_at, p.published_at, p.user_id, p.visibility,
-				u.email AS author_email, u.nickname AS author_nickname
+				u.email AS author_email, u.nickname AS author_nickname, p.comment_count
 			FROM blog_post p
 			LEFT JOIN user u ON u.user_id = p.user_id
 			${where}
@@ -204,7 +211,7 @@ const blogService = {
 			.prepare(`
 				SELECT p.post_id, p.slug, p.title, p.summary, p.cover_key, p.content_key, p.category, p.tags, p.status,
 					p.view_count, p.created_at, p.updated_at, p.published_at, p.user_id, p.visibility,
-					u.email AS author_email, u.nickname AS author_nickname
+					u.email AS author_email, u.nickname AS author_nickname, p.comment_count
 				FROM blog_post p
 				LEFT JOIN user u ON u.user_id = p.user_id
 				WHERE p.slug = ? AND p.status = 'published'
@@ -228,18 +235,21 @@ const blogService = {
 			.run();
 
 		row.view_count += 1;
+		const relatedTools = await this.getRelatedToolsForBlog(c, row);
 		if (visibility === 'logged_in' && !currentUser) {
 			return {
 				...this.toPublicPost(c, row),
 				content: '该文章内容已加密，请登录后查看',
 				contentKey: '',
-				locked: true
+				locked: true,
+				relatedTools
 			};
 		}
 		return {
 			...this.toPublicPost(c, row),
 			content: await this.readContent(c, row.content_key),
-			contentKey: row.content_key || ''
+			contentKey: row.content_key || '',
+			relatedTools
 		};
 	},
 
@@ -413,7 +423,7 @@ const blogService = {
 			.prepare(`
 				SELECT p.post_id, p.slug, p.title, p.summary, p.cover_key, p.content_key, p.category, p.tags, p.status,
 					p.view_count, p.created_at, p.updated_at, p.published_at, p.user_id, p.visibility,
-					u.email AS author_email, u.nickname AS author_nickname
+					u.email AS author_email, u.nickname AS author_nickname, p.comment_count
 				FROM blog_post p
 				LEFT JOIN user u ON u.user_id = p.user_id
 				WHERE p.slug = ?
@@ -436,11 +446,13 @@ const blogService = {
 			}
 		}
 
+		const relatedTools = await this.getRelatedToolsForBlog(c, row);
 		return {
 			...this.toPublicPost(c, row),
 			status: row.status,
 			content: await this.readContent(c, row.content_key),
-			contentKey: row.content_key || ''
+			contentKey: row.content_key || '',
+			relatedTools
 		};
 	},
 
@@ -466,29 +478,30 @@ const blogService = {
 	},
 
 	async comments(c, slug) {
-		await this.ensureTables(c);
-		const rows = await c.env.db
-			.prepare(`
-				SELECT id, slug, email, nickname, content, created_at
-				FROM blog_comments
-				WHERE slug = ?
-				ORDER BY created_at ASC, id ASC
-			`)
-			.bind(slug)
-			.all();
+		this.assertR2(c);
+		const key = `blog/comments/${slug}.json`;
+		let list = [];
+		try {
+			const obj = await c.env.r2.get(key);
+			if (obj) {
+				const text = await obj.text();
+				list = JSON.parse(text || '[]');
+			}
+		} catch (error) {
+			console.warn('Failed to load comments from R2:', error.message);
+		}
 
-		return (rows.results || []).map(row => ({
-			id: row.id,
-			slug: row.slug,
-			email: row.email,
-			nickname: row.nickname || row.email.split('@')[0],
-			content: row.content,
-			createdAt: row.created_at
+		return list.map(item => ({
+			id: item.id || Date.now(),
+			slug: item.slug || slug,
+			email: item.email || '',
+			nickname: item.nickname || (item.email ? item.email.split('@')[0] : 'Anonymous'),
+			content: item.content || '',
+			createdAt: item.createdAt || item.created_at || new Date().toISOString()
 		}));
 	},
 
 	async addComment(c, slug, payload) {
-		await this.ensureTables(c);
 		const user = c.get('user');
 		if (!user) {
 			throw new BizError('Login required', 401);
@@ -510,25 +523,50 @@ const blogService = {
 			throw new BizError('Post not found', 404);
 		}
 
+		this.assertR2(c);
+		const key = `blog/comments/${slug}.json`;
+		let list = [];
+		try {
+			const obj = await c.env.r2.get(key);
+			if (obj) {
+				const text = await obj.text();
+				list = JSON.parse(text || '[]');
+			}
+		} catch (e) {
+			// ignore or log
+		}
+
 		const now = new Date().toISOString();
 		const nickname = user.nickname || user.name || user.email.split('@')[0];
-		const result = await c.env.db
-			.prepare(`
-				INSERT INTO blog_comments (slug, email, nickname, content, created_at)
-				VALUES (?, ?, ?, ?, ?)
-				RETURNING id, slug, email, nickname, content, created_at
-			`)
-			.bind(slug, user.email, nickname, content, now)
-			.first();
 
-		return {
-			id: result.id,
-			slug: result.slug,
-			email: result.email,
-			nickname: result.nickname,
-			content: result.content,
-			createdAt: result.created_at
+		const newComment = {
+			id: Date.now() + Math.random().toString(36).substr(2, 5),
+			slug,
+			email: user.email,
+			nickname,
+			content,
+			createdAt: now
 		};
+
+		list.push(newComment);
+
+		await c.env.r2.put(key, JSON.stringify(list), {
+			httpMetadata: {
+				contentType: 'application/json; charset=utf-8',
+				cacheControl: 'public, max-age=10'
+			}
+		});
+
+		try {
+			await c.env.db
+				.prepare('UPDATE blog_post SET comment_count = ? WHERE slug = ?')
+				.bind(list.length, slug)
+				.run();
+		} catch (e) {
+			console.warn('Failed to update blog comment_count:', e.message);
+		}
+
+		return newComment;
 	},
 
 	async readContent(c, key) {
@@ -578,11 +616,52 @@ const blogService = {
 			updatedAt: row.updated_at,
 			publishedAt: row.published_at,
 			visibility: row.visibility || 'public',
+			commentCount: row.comment_count || 0,
 			author: {
 				email: authorEmail,
 				nickname: authorNickname
 			}
 		};
+	},
+
+	async getRelatedToolsForBlog(c, row) {
+		const slug = row.slug;
+		const toolsRows = await c.env.db
+			.prepare(`
+				SELECT t.*, cat.name AS category_name, cat.icon AS category_icon
+				FROM tools t
+				JOIN tool_blog_links tbl ON tbl.tool_id = t.id
+				LEFT JOIN categories cat ON cat.id = t.category_id
+				WHERE tbl.blog_id = ? OR tbl.blog_id = ?
+			`)
+			.bind(slug, String(row.post_id))
+			.all();
+
+		const relatedTools = [];
+		const user = await toolService.currentUserOptional(c);
+		const isAdmin = await toolService.isUserAdmin(c, user);
+
+		for (const toolRow of toolsRows.results || []) {
+			if (!isAdmin) {
+				if (toolRow.status !== 'published' && toolRow.status !== 'archived') continue;
+				if (toolRow.visibility === 'login' && !user) continue;
+				if (toolRow.visibility === 'role') {
+					if (!user) continue;
+					const roleRow = await c.env.db
+						.prepare('SELECT r.key, r.name FROM user u LEFT JOIN role r ON r.role_id = u.type WHERE u.user_id = ?')
+						.bind(user.userId)
+						.first();
+					const roleKey = roleRow?.key || '';
+					const roleName = roleRow?.name || '';
+					const allowedRoles = (toolRow.required_role || '').split(',').map(r => r.trim().toLowerCase());
+					const matches = allowedRoles.some(r => r && (r === roleKey.toLowerCase() || r === roleName.toLowerCase()));
+					if (!matches && allowedRoles.length > 0 && toolRow.required_role !== '') continue;
+				}
+			}
+			const toolTags = await toolService.getToolTags(c, toolRow.id);
+			relatedTools.push(toolService.mapToolRow(c, toolRow, toolTags));
+		}
+		return relatedTools;
 	},
 
 	objectUrl(c, key) {
