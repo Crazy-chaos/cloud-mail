@@ -235,10 +235,24 @@ const blogService = {
 		await this.ensureTables(c);
 		await this.assertCanManage(c);
 
-		const slug = this.cleanSlug(payload.slug);
 		const title = String(payload.title || '').trim();
-		if (!slug) throw new BizError('Slug is required', 400);
 		if (!title) throw new BizError('Title is required', 400);
+
+		let slug = this.cleanSlug(payload.slug);
+		if (!slug) {
+			let baseSlug = this.cleanSlug(title) || 'post';
+			let uniqueSlug = baseSlug;
+			let counter = 1;
+			while (true) {
+				const exist = await c.env.db.prepare('SELECT 1 FROM blog_post WHERE slug = ?').bind(uniqueSlug).first();
+				if (!exist) {
+					break;
+				}
+				uniqueSlug = `${baseSlug}-${counter}`;
+				counter++;
+			}
+			slug = uniqueSlug;
+		}
 
 		const allowed = await this.canManagePost(c, slug);
 		if (!allowed) {
