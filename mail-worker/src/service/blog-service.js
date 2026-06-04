@@ -466,14 +466,47 @@ const blogService = {
 		}
 
 		const row = await c.env.db
-			.prepare('SELECT content_key FROM blog_post WHERE slug = ?')
+			.prepare('SELECT post_id, content_key, cover_key FROM blog_post WHERE slug = ?')
 			.bind(slug)
 			.first();
 
 		await c.env.db.prepare('DELETE FROM blog_post WHERE slug = ?').bind(slug).run();
 
-		if (row?.content_key) {
-			await this.deleteBlogObject(c, row.content_key);
+		if (row) {
+			if (row.content_key && !/^(https?:)?\/\//i.test(row.content_key)) {
+				try {
+					await this.deleteBlogObject(c, row.content_key);
+				} catch (err) {
+					console.warn('Failed to delete blog content key:', row.content_key, err.message);
+				}
+			}
+			if (row.cover_key && !/^(https?:)?\/\//i.test(row.cover_key)) {
+				try {
+					await this.deleteBlogObject(c, row.cover_key);
+				} catch (err) {
+					console.warn('Failed to delete blog cover key:', row.cover_key, err.message);
+				}
+			}
+			// Delete comments json from R2
+			try {
+				await this.deleteBlogObject(c, `blog/comments/${slug}.json`);
+			} catch (err) {
+				console.warn('Failed to delete blog comments file from R2:', slug, err.message);
+			}
+			// Clean up database tables for blog comments and links
+			try {
+				await c.env.db.prepare('DELETE FROM blog_comments WHERE slug = ?').bind(slug).run();
+			} catch (err) {
+				console.warn('Failed to delete comments from blog_comments table:', err.message);
+			}
+			try {
+				await c.env.db
+					.prepare('DELETE FROM tool_blog_links WHERE blog_id = ? OR blog_id = ?')
+					.bind(slug, String(row.post_id))
+					.run();
+			} catch (err) {
+				console.warn('Failed to delete tool_blog_links:', err.message);
+			}
 		}
 	},
 
