@@ -276,6 +276,7 @@ function initEasyMDE(EasyMDE) {
     renderingConfig: {
       codeSyntaxHighlighting: true
     },
+    syncSideBySidePreviewScroll: false,
     toolbar: [
       { name: "bold", action: EasyMDE.toggleBold, className: "fa fa-bold", title: "加粗 (Ctrl-B)" },
       { name: "italic", action: EasyMDE.toggleItalic, className: "fa fa-italic", title: "斜体 (Ctrl-I)" },
@@ -651,7 +652,7 @@ function visibilityName(value) {
   padding: 18px;
   overflow-y: auto;
 
-  &:has(.EasyMDEContainer.fullscreen) {
+  &:has(.CodeMirror-fullscreen) {
     position: fixed !important;
     inset: 0 !important;
     z-index: 130000 !important;
@@ -878,13 +879,6 @@ function visibilityName(value) {
     }
   }
 
-  &.fullscreen {
-    background: rgba(255, 255, 255, 0.8) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
-    z-index: 130000 !important;
-  }
-  
   .editor-toolbar.fullscreen {
     background: rgba(255, 255, 255, 0.8) !important;
     backdrop-filter: blur(10px) !important;
@@ -893,7 +887,9 @@ function visibilityName(value) {
   }
   
   .CodeMirror-fullscreen {
-    background: transparent !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
     z-index: 130000 !important;
   }
   
@@ -907,12 +903,12 @@ function visibilityName(value) {
 
 /* Dark theme overrides for fullscreen EasyMDE */
 html.dark {
-  .editor:has(.EasyMDEContainer.fullscreen) {
+  .editor:has(.CodeMirror-fullscreen) {
     background: rgba(33, 20, 46, 0.8) !important;
     backdrop-filter: blur(10px) !important;
     -webkit-backdrop-filter: blur(10px) !important;
     
-    :deep(.EasyMDEContainer.fullscreen) {
+    :deep(.CodeMirror-fullscreen) {
       background: rgba(33, 20, 46, 0.8) !important;
       backdrop-filter: blur(10px) !important;
       -webkit-backdrop-filter: blur(10px) !important;
