@@ -662,7 +662,9 @@ function visibilityName(value) {
     border-radius: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
-    background: #ffffff !important; /* light mode */
+    background: rgba(255, 255, 255, 0.8) !important; /* light mode */
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
 
     .editor-head,
     .form-row,
@@ -877,12 +879,16 @@ function visibilityName(value) {
   }
 
   &.fullscreen {
-    background: #ffffff !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
     z-index: 130000 !important;
   }
   
   .editor-toolbar.fullscreen {
-    background: #ffffff !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
     z-index: 130001 !important;
   }
   
@@ -892,7 +898,9 @@ function visibilityName(value) {
   }
   
   .editor-preview-side {
-    background: #ffffff !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
     z-index: 130002 !important;
   }
 }
@@ -900,25 +908,35 @@ function visibilityName(value) {
 /* Dark theme overrides for fullscreen EasyMDE */
 html.dark {
   .editor:has(.EasyMDEContainer.fullscreen) {
-    background: #21142e !important;
+    background: rgba(33, 20, 46, 0.8) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
     
     :deep(.EasyMDEContainer.fullscreen) {
-      background: #21142e !important;
+      background: rgba(33, 20, 46, 0.8) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
     }
     
     :deep(.editor-toolbar.fullscreen) {
-      background: #21142e !important;
+      background: rgba(33, 20, 46, 0.8) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
     }
     
     :deep(.editor-preview-side) {
-      background: #21142e !important;
+      background: rgba(33, 20, 46, 0.8) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
     }
   }
   
   :deep(.EasyMDEContainer) {
     .editor-preview-side,
     .editor-preview {
-      background: #21142e !important;
+      background: rgba(33, 20, 46, 0.8) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
       pre {
         background: rgba(255, 255, 255, 0.05) !important;
       }
