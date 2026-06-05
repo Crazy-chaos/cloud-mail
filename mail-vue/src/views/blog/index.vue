@@ -650,6 +650,41 @@ function visibilityName(value) {
 .editor {
   padding: 18px;
   overflow-y: auto;
+
+  &:has(.EasyMDEContainer.fullscreen) {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 130000 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fafafa !important; /* light mode */
+
+    .editor-head,
+    .form-row,
+    .el-form-item:not(:last-child),
+    .el-form-item:last-child > :deep(.el-form-item__label) {
+      display: none !important;
+    }
+
+    .el-form {
+      height: 100% !important;
+
+      .el-form-item:last-child {
+        margin: 0 !important;
+        height: 100% !important;
+
+        :deep(.el-form-item__content) {
+          height: 100% !important;
+          display: block !important;
+        }
+      }
+    }
+  }
 }
 
 .editor-head {
@@ -794,7 +829,7 @@ function visibilityName(value) {
     padding: 6px 12px;
     
     button {
-      color: #fff !important;
+      color: var(--el-text-color-primary) !important;
       border-radius: 6px;
       transition: all 0.2s ease;
       width: 30px;
@@ -816,7 +851,7 @@ function visibilityName(value) {
   .CodeMirror {
     border: none !important;
     background: transparent !important;
-    color: #fff !important;
+    color: var(--el-text-color-primary) !important;
     font-family: Consolas, "SFMono-Regular", monospace !important;
     font-size: 14px !important;
     line-height: 1.6 !important;
@@ -824,34 +859,30 @@ function visibilityName(value) {
   }
   
   .CodeMirror-cursor {
-    border-left-color: #fff !important;
+    border-left-color: var(--el-text-color-primary) !important;
   }
   
   .editor-preview-side,
   .editor-preview {
-    background: #21142e !important;
-    color: #fff !important;
+    background: #fafafa !important;
+    color: var(--el-text-color-primary) !important;
     border: none !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     
     pre {
-      background: rgba(255, 255, 255, 0.05) !important;
+      background: rgba(0, 0, 0, 0.05) !important;
       color: inherit !important;
     }
   }
 
   &.fullscreen {
-    background: rgba(26, 12, 36, 0.98) !important;
-    backdrop-filter: blur(25px) !important;
-    -webkit-backdrop-filter: blur(25px) !important;
+    background: #fafafa !important;
     z-index: 130000 !important;
   }
   
   .editor-toolbar.fullscreen {
-    background: rgba(26, 12, 36, 0.98) !important;
-    backdrop-filter: blur(25px) !important;
-    -webkit-backdrop-filter: blur(25px) !important;
+    background: #fafafa !important;
     z-index: 130001 !important;
   }
   
@@ -861,10 +892,37 @@ function visibilityName(value) {
   }
   
   .editor-preview-side {
-    background: rgba(26, 12, 36, 0.98) !important;
-    backdrop-filter: blur(25px) !important;
-    -webkit-backdrop-filter: blur(25px) !important;
+    background: #fafafa !important;
     z-index: 130002 !important;
+  }
+}
+
+/* Dark theme overrides for fullscreen EasyMDE */
+html.dark {
+  .editor:has(.EasyMDEContainer.fullscreen) {
+    background: #21142e !important;
+    
+    :deep(.EasyMDEContainer.fullscreen) {
+      background: #21142e !important;
+    }
+    
+    :deep(.editor-toolbar.fullscreen) {
+      background: #21142e !important;
+    }
+    
+    :deep(.editor-preview-side) {
+      background: #21142e !important;
+    }
+  }
+  
+  :deep(.EasyMDEContainer) {
+    .editor-preview-side,
+    .editor-preview {
+      background: #21142e !important;
+      pre {
+        background: rgba(255, 255, 255, 0.05) !important;
+      }
+    }
   }
 }
 </style>
