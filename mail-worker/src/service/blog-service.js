@@ -171,9 +171,14 @@ const blogService = {
 		const isSuperAdmin = user && user.email === c.env.admin;
 		const canManageAll = isSuperAdmin || permKeys.includes('blog:manage') || permKeys.includes('*');
 
-		if (!canManageAll && permKeys.includes('blog:manage_own') && user) {
-			filters.push('p.user_id = ?');
-			params.push(user.userId);
+		if (!canManageAll && user) {
+			if (permKeys.includes('blog:manage_group')) {
+				filters.push('u.type = ?');
+				params.push(user.type);
+			} else if (permKeys.includes('blog:manage_own')) {
+				filters.push('p.user_id = ?');
+				params.push(user.userId);
+			}
 		}
 
 		const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
@@ -440,9 +445,16 @@ const blogService = {
 		const permKeys = user ? await permService.userPermKeys(c, user.userId) : [];
 		const canManageAll = isSuperAdmin || permKeys.includes('blog:manage') || permKeys.includes('*');
 
-		if (!canManageAll && permKeys.includes('blog:manage_own')) {
-			if (row.user_id !== user.userId) {
-				throw new BizError('Permission denied to view this blog post', 403);
+		if (!canManageAll && user) {
+			if (permKeys.includes('blog:manage_group')) {
+				const author = await c.env.db.prepare('SELECT type FROM user WHERE user_id = ?').bind(row.user_id).first();
+				if (author && author.type !== user.type) {
+					throw new BizError('Permission denied to view this blog post', 403);
+				}
+			} else if (permKeys.includes('blog:manage_own')) {
+				if (row.user_id !== user.userId) {
+					throw new BizError('Permission denied to view this blog post', 403);
+				}
 			}
 		}
 
@@ -817,6 +829,15 @@ const blogService = {
 		const permKeys = await permService.userPermKeys(c, user.userId);
 		if (permKeys.includes('blog:manage') || permKeys.includes('*')) {
 			return true;
+		}
+		if (permKeys.includes('blog:manage_group')) {
+			if (!slug) return true;
+			const oldRow = await c.env.db
+				.prepare('SELECT u.type FROM blog_post p JOIN user u ON u.user_id = p.user_id WHERE p.slug = ?')
+				.bind(slug)
+				.first();
+			if (!oldRow) return true;
+			return oldRow.type === user.type;
 		}
 		if (permKeys.includes('blog:manage_own')) {
 			if (!slug) return true;

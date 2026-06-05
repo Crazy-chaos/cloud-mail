@@ -34,6 +34,7 @@ const dbInit = {
 		await this.v3_3DB(c);
 		await this.v3_4DB(c);
 		await this.v3_5DB(c);
+		await this.v3_6DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -173,6 +174,25 @@ const dbInit = {
 			await c.env.db.prepare(`UPDATE perm SET sort = 4 WHERE perm_key = 'tools:manage_own'`).run();
 		} catch (e) {
 			console.warn(`跳过更新权限分类归属：${e.message}`);
+		}
+	},
+
+	async v3_6DB(c) {
+		try {
+			await c.env.db.prepare(`
+				INSERT INTO perm (name, perm_key, pid, type, sort)
+				SELECT '管理本组博客', 'blog:manage_group', 
+					(SELECT perm_id FROM perm WHERE name = '博客资源管理' LIMIT 1), 
+					2, 1.5
+				WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'blog:manage_group')
+			`).run();
+			await c.env.db.prepare(`
+				UPDATE perm 
+				SET pid = (SELECT perm_id FROM perm WHERE name = '博客资源管理' LIMIT 1)
+				WHERE perm_key = 'blog:manage_group';
+			`).run();
+		} catch (e) {
+			console.warn(`跳过增加 blog:manage_group 权限：${e.message}`);
 		}
 	},
 

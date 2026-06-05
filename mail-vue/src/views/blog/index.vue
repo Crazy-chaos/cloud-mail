@@ -120,23 +120,8 @@
             <img v-if="coverPreview" class="cover-preview" :src="coverPreview" alt="">
           </el-form-item>
 
-          <el-form-item label="正文 Markdown">
-            <div class="markdown-toolbar">
-              <el-button round :loading="uploadingImage" @click="chooseMarkdownImage">
-                <Icon icon="ion:image-outline" width="18" height="18" />
-                插入图片
-              </el-button>
-              <span>支持 Markdown 图片语法：![描述](图片地址)</span>
-            </div>
-            <el-input
-                ref="contentInputRef"
-                v-model="form.content"
-                class="content-input"
-                type="textarea"
-                :rows="18"
-                resize="none"
-                placeholder="# 标题&#10;&#10;这里写正文..."
-            />
+          <el-form-item label="正文 *">
+            <textarea id="blogEditorTextarea" placeholder="# 标题&#10;&#10;这里写正文..."></textarea>
           </el-form-item>
         </el-form>
       </section>
@@ -145,7 +130,7 @@
 </template>
 
 <script setup>
-import {defineOptions, reactive, ref} from 'vue';
+import {defineOptions, reactive, ref, onMounted, onUnmounted} from 'vue';
 import {Icon} from '@iconify/vue';
 import {ElMessage, ElMessageBox} from 'element-plus';
 import {blogAdminList, blogDeletePost, blogPostDetail, blogSavePost, blogUploadCover} from '@/request/blog.js';
@@ -154,6 +139,40 @@ import {compressImage, fileToBase64} from '@/utils/file-utils.js';
 defineOptions({
   name: 'blog-admin'
 });
+
+const EASYMDE_JS_URL = 'https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js';
+const EASYMDE_CSS_URL = 'https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css';
+
+let loadPromise = null;
+
+function loadEasyMDE() {
+  if (loadPromise) return loadPromise;
+  loadPromise = new Promise((resolve, reject) => {
+    if (window.EasyMDE) {
+      resolve(window.EasyMDE);
+      return;
+    }
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = EASYMDE_CSS_URL;
+    document.head.appendChild(link);
+    
+    const script = document.createElement('script');
+    script.src = EASYMDE_JS_URL;
+    script.onload = () => {
+      if (window.EasyMDE) {
+        resolve(window.EasyMDE);
+      } else {
+        reject(new Error('EasyMDE failed to load.'));
+      }
+    };
+    script.onerror = () => reject(new Error('EasyMDE script load failed.'));
+    document.body.appendChild(script);
+  });
+  return loadPromise;
+}
+
+let easyMDEInstance = null;
 
 const params = reactive({
   page: 1,
@@ -183,15 +202,134 @@ const uploadingCover = ref(false);
 const uploadingImage = ref(false);
 const coverPreview = ref('');
 const loadedSlug = ref('');
-const contentInputRef = ref(null);
 
 getList();
+
+onMounted(async () => {
+  try {
+    const EasyMDE = await loadEasyMDE();
+    initEasyMDE(EasyMDE);
+  } catch (err) {
+    ElMessage.error('加载 Markdown 编辑器失败: ' + err.message);
+  }
+});
+
+onUnmounted(() => {
+  if (easyMDEInstance) {
+    easyMDEInstance.toTextArea();
+    easyMDEInstance = null;
+  }
+});
+
+function extractBvid(urlOrId) {
+  if (!urlOrId) return null;
+  const match = urlOrId.match(/(BV[a-zA-Z0-9]{10})/i);
+  return match ? match[1] : null;
+}
+
+function makeBilibiliIframe(bvid) {
+  return `<iframe style="width: 100%; aspect-ratio: 16/9;" src="https://player.bilibili.com/player.html?bvid=${bvid}" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>`;
+}
+
+async function insertBilibiliVideo(editor) {
+  try {
+    const res = await ElMessageBox.prompt('请输入 B 站视频链接或 BV 号：\n例如：https://www.bilibili.com/video/BV1GPGR6GEa6', '插入 B 站视频', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPlaceholder: 'https://www.bilibili.com/video/...'
+    });
+    if (!res || !res.value) return;
+    const bvid = extractBvid(res.value);
+    if (!bvid) {
+      ElMessage.warning('未识别到有效的 B 站 BV 号，请检查输入的链接！');
+      return;
+    }
+    const iframe = makeBilibiliIframe(bvid);
+    const cm = editor.codemirror;
+    const doc = cm.getDoc();
+    const cursor = doc.getCursor();
+    doc.replaceRange(iframe, cursor);
+  } catch (err) {
+    // cancelled
+  }
+}
+
+function initEasyMDE(EasyMDE) {
+  if (easyMDEInstance) {
+    easyMDEInstance.value(form.content || '');
+    return;
+  }
+  
+  easyMDEInstance = new EasyMDE({
+    element: document.getElementById('blogEditorTextarea'),
+    initialValue: form.content || '',
+    autoDownloadFontAwesome: true,
+    spellChecker: false,
+    autosave: {
+      enabled: true,
+      uniqueId: "TaffyMailBlogEditorAutoSave",
+      delay: 10000,
+    },
+    renderingConfig: {
+      codeSyntaxHighlighting: true
+    },
+    toolbar: [
+      { name: "bold", action: EasyMDE.toggleBold, className: "fa fa-bold", title: "加粗 (Ctrl-B)" },
+      { name: "italic", action: EasyMDE.toggleItalic, className: "fa fa-italic", title: "斜体 (Ctrl-I)" },
+      { name: "heading", action: EasyMDE.toggleHeadingSmaller, className: "fa fa-header", title: "标题 (Ctrl-H)" },
+      "|",
+      { name: "quote", action: EasyMDE.toggleBlockquote, className: "fa fa-quote-left", title: "引用 (Ctrl-')" },
+      { name: "unordered-list", action: EasyMDE.toggleUnorderedList, className: "fa fa-list-ul", title: "无序列表 (Ctrl-L)" },
+      { name: "ordered-list", action: EasyMDE.toggleOrderedList, className: "fa fa-list-ol", title: "有序列表 (Ctrl-Alt-L)" },
+      "|",
+      { name: "link", action: EasyMDE.drawLink, className: "fa fa-link", title: "插入链接 (Ctrl-K)" },
+      { 
+        name: "image", 
+        action: (editor) => {
+          chooseMarkdownImage(editor);
+        }, 
+        className: "fa fa-picture-o", 
+        title: "插入图片 (Ctrl-Alt-I)" 
+      },
+      { name: "table", action: EasyMDE.drawTable, className: "fa fa-table", title: "插入表格" },
+      { name: "bilibili", action: insertBilibiliVideo, className: "fa fa-play-circle", title: "插入B站视频" },
+      "|",
+      { name: "preview", action: EasyMDE.togglePreview, className: "fa fa-eye no-disable", title: "预览 (Ctrl-P)" },
+      { name: "side-by-side", action: EasyMDE.toggleSideBySide, className: "fa fa-columns no-disable no-mobile", title: "分栏预览 (F9)" },
+      { name: "fullscreen", action: EasyMDE.toggleFullScreen, className: "fa fa-arrows-alt no-disable no-mobile", title: "全屏 (F11)" },
+      "|",
+      { name: "guide", action: () => window.open("https://www.markdownguide.org/basic-syntax/", "_blank"), className: "fa fa-question-circle", title: "Markdown 使用指南" }
+    ]
+  });
+
+  easyMDEInstance.codemirror.on('change', () => {
+    form.content = easyMDEInstance.value();
+  });
+
+  easyMDEInstance.codemirror.on('paste', (cm, e) => {
+    const text = e.clipboardData?.getData('text/plain');
+    if (text) {
+      const bvid = extractBvid(text);
+      if (bvid && (text.includes('bilibili.com') || text.startsWith('BV'))) {
+        e.preventDefault();
+        const iframe = makeBilibiliIframe(bvid);
+        const doc = cm.getDoc();
+        const cursor = doc.getCursor();
+        doc.replaceRange(iframe, cursor);
+      }
+    }
+  });
+}
 
 function resetForm(data = emptyForm()) {
   Object.assign(form, emptyForm(), data);
   tagText.value = (form.tags || []).join(', ');
   loadedSlug.value = data.slug || '';
   coverPreview.value = data.coverUrl || '';
+  
+  if (easyMDEInstance) {
+    easyMDEInstance.value(form.content || '');
+  }
 }
 
 function getList() {
@@ -227,19 +365,19 @@ function selectPost(post) {
   });
 }
 
-function chooseMarkdownImage() {
+function chooseMarkdownImage(editor) {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/png,image/jpeg,image/webp,image/gif,image/avif';
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
-    await uploadMarkdownImage(file);
+    await uploadMarkdownImage(file, editor);
   };
   input.click();
 }
 
-async function uploadMarkdownImage(file) {
+async function uploadMarkdownImage(file, editor) {
   if (!file.type.startsWith('image/')) {
     ElMessage.warning('请选择图片文件');
     return;
@@ -257,32 +395,18 @@ async function uploadMarkdownImage(file) {
       contentType: image.type || file.type,
       content
     });
-    insertAtCursor(`![${file.name.replace(/\.[^.]+$/, '')}](${data.url})`);
+    
+    if (editor) {
+      const cm = editor.codemirror;
+      const doc = cm.getDoc();
+      const cursor = doc.getCursor();
+      const text = `![${file.name.replace(/\.[^.]+$/, '')}](${data.url})`;
+      doc.replaceRange(text, cursor);
+    }
     ElMessage.success('图片已插入正文');
   } finally {
     uploadingImage.value = false;
   }
-}
-
-function insertAtCursor(text) {
-  const textarea = contentInputRef.value?.textarea || contentInputRef.value?.$el?.querySelector('textarea');
-  if (!textarea) {
-    form.content = `${form.content || ''}\n\n${text}\n`;
-    return;
-  }
-
-  const start = textarea.selectionStart ?? form.content.length;
-  const end = textarea.selectionEnd ?? form.content.length;
-  const before = form.content.slice(0, start);
-  const after = form.content.slice(end);
-  const prefix = before && !before.endsWith('\n') ? '\n\n' : '';
-  const suffix = after && !after.startsWith('\n') ? '\n\n' : '\n';
-  form.content = `${before}${prefix}${text}${suffix}${after}`;
-  requestAnimationFrame(() => {
-    textarea.focus();
-    const cursor = start + prefix.length + text.length + suffix.length;
-    textarea.setSelectionRange(cursor, cursor);
-  });
 }
 
 function chooseCover() {
@@ -331,6 +455,9 @@ function savePost() {
   })
       .then(data => {
         ElMessage.success('已保存');
+        if (easyMDEInstance) {
+          easyMDEInstance.clearAutosavedValue();
+        }
         resetForm({
           slug: data.slug,
           title: data.title,
@@ -638,6 +765,68 @@ function visibilityName(value) {
   .cover-row {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+
+:deep(.EasyMDEContainer) {
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05) !important;
+  
+  .editor-toolbar {
+    border: none !important;
+    border-bottom: 1px solid var(--glass-border) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    opacity: 1 !important;
+    padding: 6px 12px;
+    
+    button {
+      color: #fff !important;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      width: 30px;
+      height: 30px;
+      margin: 0 2px;
+      
+      &:hover,
+      &.active {
+        background: rgba(255, 121, 198, 0.26) !important;
+        color: #ff79c6 !important;
+      }
+    }
+    
+    i.separator {
+      border-right-color: var(--glass-border) !important;
+    }
+  }
+  
+  .CodeMirror {
+    border: none !important;
+    background: transparent !important;
+    color: #fff !important;
+    font-family: Consolas, "SFMono-Regular", monospace !important;
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+    min-height: 350px;
+  }
+  
+  .CodeMirror-cursor {
+    border-left-color: #fff !important;
+  }
+  
+  .editor-preview-side,
+  .editor-preview {
+    background: #21142e !important;
+    color: #fff !important;
+    border: none !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    
+    pre {
+      background: rgba(255, 255, 255, 0.05) !important;
+      color: inherit !important;
+    }
   }
 }
 </style>

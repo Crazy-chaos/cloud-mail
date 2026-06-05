@@ -99,6 +99,7 @@ const premKey = {
 	'reg-key:query': ['/regKey/list','/regKey/history'],
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 	'blog:manage': ['/blog/post', '/blog/admin', '/blog/upload'],
+	'blog:manage_group': ['/blog/post', '/blog/admin', '/blog/upload'],
 	'blog:manage_own': ['/blog/post', '/blog/admin', '/blog/upload'],
 	'tools:manage': ['/admin/tools', '/admin/categories', '/admin/tags'],
 	'tools:manage_own': ['/admin/tools']
