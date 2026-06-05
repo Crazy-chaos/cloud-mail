@@ -257,6 +257,9 @@ async function insertBilibiliVideo(editor) {
 function initEasyMDE(EasyMDE) {
   if (easyMDEInstance) {
     easyMDEInstance.value(form.content || '');
+    setTimeout(() => {
+      easyMDEInstance.codemirror.refresh();
+    }, 100);
     return;
   }
   
@@ -319,6 +322,12 @@ function initEasyMDE(EasyMDE) {
       }
     }
   });
+
+  setTimeout(() => {
+    if (easyMDEInstance) {
+      easyMDEInstance.codemirror.refresh();
+    }
+  }, 150);
 }
 
 function resetForm(data = emptyForm()) {
@@ -329,6 +338,9 @@ function resetForm(data = emptyForm()) {
   
   if (easyMDEInstance) {
     easyMDEInstance.value(form.content || '');
+    setTimeout(() => {
+      easyMDEInstance.codemirror.refresh();
+    }, 100);
   }
 }
 
