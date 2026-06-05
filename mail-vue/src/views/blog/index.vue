@@ -828,5 +828,31 @@ function visibilityName(value) {
       color: inherit !important;
     }
   }
+
+  &.fullscreen {
+    background: rgba(26, 12, 36, 0.98) !important;
+    backdrop-filter: blur(25px) !important;
+    -webkit-backdrop-filter: blur(25px) !important;
+    z-index: 130000 !important;
+  }
+  
+  .editor-toolbar.fullscreen {
+    background: rgba(26, 12, 36, 0.98) !important;
+    backdrop-filter: blur(25px) !important;
+    -webkit-backdrop-filter: blur(25px) !important;
+    z-index: 130001 !important;
+  }
+  
+  .CodeMirror-fullscreen {
+    background: transparent !important;
+    z-index: 130000 !important;
+  }
+  
+  .editor-preview-side {
+    background: rgba(26, 12, 36, 0.98) !important;
+    backdrop-filter: blur(25px) !important;
+    -webkit-backdrop-filter: blur(25px) !important;
+    z-index: 130002 !important;
+  }
 }
 </style>
