@@ -662,7 +662,7 @@ function visibilityName(value) {
     border-radius: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
-    background: #fafafa !important; /* light mode */
+    background: #ffffff !important; /* light mode */
 
     .editor-head,
     .form-row,
@@ -864,7 +864,7 @@ function visibilityName(value) {
   
   .editor-preview-side,
   .editor-preview {
-    background: #fafafa !important;
+    background: #ffffff !important;
     color: var(--el-text-color-primary) !important;
     border: none !important;
     backdrop-filter: blur(20px);
@@ -877,12 +877,12 @@ function visibilityName(value) {
   }
 
   &.fullscreen {
-    background: #fafafa !important;
+    background: #ffffff !important;
     z-index: 130000 !important;
   }
   
   .editor-toolbar.fullscreen {
-    background: #fafafa !important;
+    background: #ffffff !important;
     z-index: 130001 !important;
   }
   
@@ -892,7 +892,7 @@ function visibilityName(value) {
   }
   
   .editor-preview-side {
-    background: #fafafa !important;
+    background: #ffffff !important;
     z-index: 130002 !important;
   }
 }
