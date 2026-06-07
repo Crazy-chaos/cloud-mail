@@ -330,7 +330,7 @@ const toolService = {
 
 		return new Response(fileObj.body, {
 			headers: {
-				'Content-Type': fileObj.httpMetadata?.contentType || (isHtml ? 'text/html; charset=utf-8' : 'application/octet-stream'),
+				'Content-Type': isHtml ? 'text/html; charset=utf-8' : (fileObj.httpMetadata?.contentType || 'application/octet-stream'),
 				'Content-Disposition': isHtml ? 'inline' : `attachment; filename="${encodeURIComponent(filename)}"`,
 				'Cache-Control': 'public, max-age=300'
 			}
@@ -462,7 +462,7 @@ const toolService = {
 		await this.assertCanManage(c);
 		const content = String(payload.content || ''); // base64
 		const filename = String(payload.filename || 'file').trim();
-		const contentType = String(payload.contentType || 'application/octet-stream').trim();
+		let contentType = String(payload.contentType || 'application/octet-stream').trim();
 		const maxSize = 100 * 1024 * 1024; // 100MB limit
 
 		if (!content) throw new BizError('File content is required', 400);
@@ -474,6 +474,10 @@ const toolService = {
 		}
 
 		const ext = fileUtils.getExtFileName(filename).toLowerCase();
+		if (ext === '.html' || ext === '.htm') {
+			contentType = 'text/html';
+		}
+
 		const uuidStr = crypto.randomUUID();
 		let key = '';
 		if (contentType.startsWith('image/')) {

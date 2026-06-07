@@ -662,6 +662,8 @@ const blogService = {
 			publishedAt: row.published_at,
 			visibility: row.visibility || 'public',
 			commentCount: row.comment_count || 0,
+			authorEmail,
+			authorNickname,
 			author: {
 				email: authorEmail,
 				nickname: authorNickname
