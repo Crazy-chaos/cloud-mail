@@ -7,8 +7,12 @@ import { cors } from 'hono/cors';
 const allowedOrigins = new Set([
 	'https://www.crazychaos.top',
 	'https://crazychaos.top',
+	'https://game.crazychaos.top',
+	'https://newapp.crazychaos.top',
 	'http://localhost:5555',
-	'http://127.0.0.1:5555'
+	'http://127.0.0.1:5555',
+	'http://localhost:5173',
+	'http://127.0.0.1:5173'
 ]);
 
 app.use('*', async (c, next) => {
