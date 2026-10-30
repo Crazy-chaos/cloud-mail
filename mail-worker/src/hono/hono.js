@@ -43,7 +43,7 @@ app.use('*', cors({
 	origin: (origin) => allowedOrigins.has(origin) ? origin : 'https://www.crazychaos.top',
 	credentials: true,
 	allowHeaders: ['Content-Type', 'Authorization', 'accept-language'],
-	allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+	allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 	maxAge: 86400
 }));
 
