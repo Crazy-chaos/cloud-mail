@@ -50,8 +50,16 @@ export const db = {
 let schemaReady = false;
 export async function ensureSchema(c) {
 	if (schemaReady) return;
-	const stmts = DDL.map(sql => c.env.db.prepare(sql));
-	await c.env.db.batch(stmts);
+	await c.env.db.batch(DDL.map(sql => c.env.db.prepare(sql)));
+
+	// 一次性迁移：端到端加密已下线，历史会话统一转明文。
+	// 旧密文本身解不开了，但新消息可以正常收发。
+	const flag = await c.env.db.prepare("SELECT v FROM chat_setting WHERE k = 'migrated_plain'").first();
+	if (!flag) {
+		await c.env.db.prepare("UPDATE chat_conversation SET enc_mode = 'plain' WHERE enc_mode = 'e2ee'").run();
+		await c.env.db.prepare("INSERT OR REPLACE INTO chat_setting (k, v) VALUES ('migrated_plain', '1')").run();
+	}
+
 	schemaReady = true;
 }
 

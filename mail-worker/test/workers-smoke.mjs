@@ -86,7 +86,7 @@ const png = Buffer.from(
 	r = await api('/chat/conversations', { token: A, method: 'POST', body: { name: '私密群', visibility: 'private', joinMode: 'open', encMode: 'plain' } });
 	const pid = r.data?.data?.id;
 	check('私密群创建成功', r.status === 200 && Boolean(pid), r.data);
-	check('私密群强制端到端加密', r.data?.data?.encMode === 'e2ee', r.data?.data?.encMode);
+	check('私密群统一明文存储', r.data?.data?.encMode === 'plain', r.data?.data?.encMode);
 	check('私密群强制邀请码', r.data?.data?.joinMode === 'invite', r.data?.data?.joinMode);
 
 	r = await api('/chat/public/groups');
@@ -163,11 +163,12 @@ const png = Buffer.from(
 	r = await api(`/chat/conversations/${pid}/messages`, { token: B });
 	check('通过后可以读消息', r.status === 200, r.status);
 
-	r = await api(`/chat/conversations/${pid}/messages`, { token: B, method: 'POST', body: { kind: 'text', body: { text: '明文没带密文' } } });
-	check('加密群必须提交密文', r.status === 400, r.status);
+	r = await api(`/chat/conversations/${pid}/messages`, { token: B, method: 'POST', body: { kind: 'text', body: { text: '私密群也能直接发明文' } } });
+	check('私密群发明文消息成功', r.status === 200, r.status);
 
-	r = await api(`/chat/conversations/${pid}/messages`, { token: B, method: 'POST', body: { kind: 'text', body: { iv: 'aXY=', ct: 'Y3Q=' } } });
-	check('加密群提交密文成功', r.status === 200, r.status);
+	r = await api(`/chat/conversations/${pid}/messages`, { token: B });
+	const lastMsg = (r.data?.data?.messages || []).slice(-1)[0];
+	check('消息以明文保存，成员读得到原文', lastMsg?.body?.text === '私密群也能直接发明文', lastMsg?.body);
 
 	console.log('== 群密钥 ==');
 	r = await api(`/chat/conversations/${pid}/keys`, { token: A, method: 'POST', body: { userId: 'alice@crazychaos.top', wrapped: 'wrapped-for-alice' } });
@@ -207,14 +208,14 @@ const png = Buffer.from(
 	check('未登录不能上传', up.status === 401, up.status);
 
 	up = await fetch(BASE + `/chat/upload?conv=${pid}`, {
-		method: 'POST', headers: { Authorization: A, 'Content-Type': 'application/octet-stream' }, body: Buffer.from('cipher-bytes')
+		method: 'POST', headers: { Authorization: A, 'Content-Type': 'image/png' }, body: png
 	});
-	const encKey = (await up.json()).data?.key || '';
-	check('加密群上传密文', up.status === 200 && encKey.endsWith('.bin'), up.status);
-	got = await fetch(BASE + '/chat/blob/' + encKey);
-	check('游客读不到加密群图片', got.status === 403, got.status);
-	got = await fetch(BASE + '/chat/blob/' + encKey, { headers: { Authorization: A } });
-	check('成员能读加密群图片', got.status === 200, got.status);
+	const privKey = (await up.json()).data?.key || '';
+	check('私密群上传图片', up.status === 200 && privKey.startsWith(pid + '/'), up.status);
+	got = await fetch(BASE + '/chat/blob/' + privKey);
+	check('游客读不到私密群图片', got.status === 403, got.status);
+	got = await fetch(BASE + '/chat/blob/' + privKey, { headers: { Authorization: A } });
+	check('成员能读私密群图片', got.status === 200, got.status);
 
 	console.log('== 头像与找人 ==');
 	up = await fetch(BASE + '/chat/me/avatar/upload', {
@@ -249,7 +250,7 @@ const png = Buffer.from(
 	r = await api('/chat/dm', { token: A, method: 'POST', body: { userId: 'bob@crazychaos.top' } });
 	const dmid = r.data?.data?.id;
 	check('建立私聊', r.status === 200 && String(dmid).startsWith('dm_'), dmid);
-	check('私聊是端到端加密', r.data?.data?.encMode === 'e2ee', r.data?.data?.encMode);
+	check('私聊统一明文存储', r.data?.data?.encMode === 'plain', r.data?.data?.encMode);
 	check('私聊带对方资料', r.data?.data?.peer?.uid === 3, r.data?.data?.peer);
 	r = await api('/chat/dm', { token: A, method: 'POST', body: { userId: 'bob@crazychaos.top' } });
 	check('重复开私聊返回同一个会话', r.data?.data?.id === dmid, r.data?.data?.id);

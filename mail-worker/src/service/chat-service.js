@@ -224,9 +224,9 @@ export const chatService = {
 
 		const visibility = oneOf(body.visibility, ['public', 'private'], 'public');
 		let joinMode = oneOf(body.joinMode, ['open', 'invite', 'approval'], 'approval');
-		let encMode = oneOf(body.encMode, ['plain', 'e2ee'], 'e2ee');
-		// 私密群强制「邀请码 + 端到端」
-		if (visibility === 'private') { joinMode = 'invite'; encMode = 'e2ee'; }
+		// 端到端加密已下线：所有群统一明文入库，访问控制靠成员身份 + 接口鉴权
+		const encMode = 'plain';
+		if (visibility === 'private') joinMode = 'invite';
 
 		const id = uid();
 		const t = now();
@@ -252,7 +252,7 @@ export const chatService = {
 			await db.run(c, `INSERT INTO chat_conversation
 				(id, type, name, description, visibility, join_mode, enc_mode, owner_id, created_at, updated_at)
 				VALUES (?,?,?,?,?,?,?,?,?,?)`,
-				id, 'dm', '', '', 'private', 'invite', 'e2ee', user.userId, t, t);
+				id, 'dm', '', '', 'private', 'invite', 'plain', user.userId, t, t);
 			await db.run(c, `INSERT INTO chat_member (conv_id, user_id, role, status, joined_at)
 				VALUES (?,?,?,?,?)`, id, user.userId, 'owner', 'active', t);
 			await db.run(c, `INSERT INTO chat_member (conv_id, user_id, role, status, joined_at)
@@ -543,18 +543,15 @@ export const chatService = {
 			const key = clampStr(obj.key, 300);
 			if (!key || key.indexOf(conv.id + '/') !== 0) throw new BizError('图片引用不合法', 400);
 			const iv = clampStr(obj.iv, 64);
-			if (conv.enc_mode === 'e2ee' && !iv) throw new BizError('加密群必须带上图片的 iv', 400);
 			payload = JSON.stringify({
 				key, iv,
 				w: Math.max(0, Math.min(8000, toInt(obj.w, 0))),
 				h: Math.max(0, Math.min(8000, toInt(obj.h, 0))),
 				enc: conv.enc_mode === 'e2ee'
 			});
-		} else if (conv.enc_mode === 'e2ee') {
-			if (!bodyRaw || typeof bodyRaw !== 'object'
-				|| typeof bodyRaw.ct !== 'string' || typeof bodyRaw.iv !== 'string') {
-				throw new BizError('加密群组必须提交密文', 400);
-			}
+		} else if (conv.enc_mode === 'e2ee' && bodyRaw && typeof bodyRaw === 'object'
+			&& typeof bodyRaw.ct === 'string' && typeof bodyRaw.iv === 'string') {
+			// 历史加密群仍可收发密文，新建的群不会走这里
 			if (bodyRaw.ct.length > 24_000) throw new BizError('消息过长', 413);
 			payload = JSON.stringify({ iv: bodyRaw.iv.slice(0, 64), ct: bodyRaw.ct.slice(0, 24_000) });
 		} else {
