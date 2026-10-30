@@ -7,7 +7,8 @@
 
 import { db, now } from './chat-core';
 
-const VAPID_KV_KEY = 'chat:vapid';
+// 放 D1 的 chat_setting：KV 免费版写入额度太少，不适合存这种会被反复更新的键
+const VAPID_SETTING_KEY = 'vapid_keys';
 const VAPID_SUB = 'mailto:admin@crazychaos.top';
 const RECORD_SIZE = 4096;
 
@@ -52,16 +53,37 @@ let localKeys = null;
 
 export async function loadVapid(c) {
 	if (localKeys) return localKeys;
-	const cached = await c.env.kv.get(VAPID_KV_KEY, { type: 'json' });
-	if (cached && cached.privateJwk) {
-		localKeys = cached;
-		return cached;
+
+	const row = await db.first(c, 'SELECT v FROM chat_setting WHERE k = ?', VAPID_SETTING_KEY);
+	if (row && row.v) {
+		try {
+			const parsed = JSON.parse(row.v);
+			if (parsed && parsed.privateJwk) {
+				localKeys = parsed;
+				return parsed;
+			}
+		} catch {
+			/* 损坏则重新生成 */
+		}
 	}
+
 	const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
 	const privateJwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
 	const publicRaw = new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey));
 	const data = { privateJwk, publicB64u: b64uEncode(publicRaw) };
-	await c.env.kv.put(VAPID_KV_KEY, JSON.stringify(data));
+
+	// 并发首次请求时只让一个写入生效
+	await db.run(c, `INSERT INTO chat_setting (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING`,
+		VAPID_SETTING_KEY, JSON.stringify(data));
+	const saved = await db.first(c, 'SELECT v FROM chat_setting WHERE k = ?', VAPID_SETTING_KEY);
+	if (saved && saved.v) {
+		try {
+			localKeys = JSON.parse(saved.v);
+			return localKeys;
+		} catch {
+			/* fallthrough */
+		}
+	}
 	localKeys = data;
 	return data;
 }

@@ -134,6 +134,29 @@ export const DDL = [
 		v TEXT NOT NULL DEFAULT ''
 	)`,
 
+	// 聊天专有资料。账号本身仍在 D1 的 user 表，这里只放邮箱系统没有的字段。
+	// 之所以不放 KV：免费版 KV 每天只有 1000 次写入，发消息记账会很快打满。
+	`CREATE TABLE IF NOT EXISTS chat_profile (
+		user_id        INTEGER PRIMARY KEY,
+		avatar         TEXT NOT NULL DEFAULT '',
+		qq             TEXT NOT NULL DEFAULT '',
+		pub_key        TEXT,
+		key_backup     TEXT,
+		key_updated_at INTEGER NOT NULL DEFAULT 0,
+		banned         INTEGER NOT NULL DEFAULT 0,
+		updated_at     INTEGER NOT NULL DEFAULT 0
+	)`,
+
+	`CREATE INDEX IF NOT EXISTS idx_chat_profile_banned ON chat_profile (banned)`,
+
+	// 只在低频动作（上传图片/头像）上用的滑动窗口计数
+	`CREATE TABLE IF NOT EXISTS chat_throttle (
+		bucket TEXT NOT NULL,
+		ts     INTEGER NOT NULL
+	)`,
+
+	`CREATE INDEX IF NOT EXISTS idx_chat_throttle ON chat_throttle (bucket, ts)`,
+
 	`CREATE TABLE IF NOT EXISTS chat_push_sub (
 		endpoint   TEXT PRIMARY KEY,
 		user_id    INTEGER NOT NULL,

@@ -5,7 +5,7 @@
  * 加密群只发「有新消息」，正文永不出服务器。
  */
 
-import { db, now, safeParse, convRow, membership } from './chat-core';
+import { db, now, safeParse, convRow, getProfile, getProfiles } from './chat-core';
 
 export async function pickBot(c, conv) {
 	if (conv.notify_bot_id) {
@@ -28,19 +28,21 @@ export async function notifyTargets(c, conv, senderId) {
 		const other = await db.first(c,
 			'SELECT user_id FROM chat_member WHERE conv_id = ? AND user_id <> ? LIMIT 1', conv.id, senderId);
 		if (!other) return [];
-		const prof = await c.env.kv.get('chat:user:' + other.user_id, { type: 'json' });
-		const qq = prof && prof.qq ? String(prof.qq).trim() : '';
+		const prof = await getProfile(c, Number(other.user_id));
+		const qq = prof.qq ? String(prof.qq).trim() : '';
 		return qq ? [{ userId: Number(other.user_id), qq }] : [];
 	}
 	const rows = await db.all(c, `SELECT mem.user_id, mem.qq AS member_qq
 		FROM chat_member mem
 		WHERE mem.conv_id = ? AND mem.status = 'active' AND mem.user_id <> ?`, conv.id, senderId);
+	// 一次批量取个人 QQ（群内绑定优先，其次全站绑定）
+	const profiles = await getProfiles(c, rows.map(r => Number(r.user_id)));
 	const out = [];
 	for (const r of rows) {
 		let qq = (r.member_qq || '').trim();
 		if (!qq) {
-			const prof = await c.env.kv.get('chat:user:' + r.user_id, { type: 'json' });
-			qq = prof && prof.qq ? String(prof.qq).trim() : '';
+			const prof = profiles.get(Number(r.user_id)) || {};
+			qq = prof.qq ? String(prof.qq).trim() : '';
 		}
 		if (qq) out.push({ userId: Number(r.user_id), qq });
 	}

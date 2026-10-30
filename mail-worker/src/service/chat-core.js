@@ -86,42 +86,62 @@ export function isSiteAdmin(c, user) {
 /** 站内 uid 就是 D1 user 表的主键，绝不自增 */
 export const uidOf = user => (user ? Number(user.userId) : null);
 
-// ---------------------------------------------------------------- KV 资料
+// ---------------------------------------------------------------- 聊天资料（D1）
 
-const PROFILE_TTL = 30_000;
-const profileCache = new Map(); // userId -> { at, data }
+/**
+ * 头像 / QQ / 公钥 / 备份 / 封禁 —— 邮箱系统的 user 表里没有，但也不能放 KV：
+ * 免费版 KV 每天只有 1000 次写入，而这些字段会随每次改头像、每次发提醒被写。
+ * 放 D1 后可以一条 SQL 批量取，且不占 KV 额度。
+ */
+const emptyProfile = () => ({ avatar: '', qq: '', pubKey: null, keyBackup: null, keyUpdatedAt: 0, banned: 0 });
 
-const emptyProfile = () => ({ avatar: '', qq: '', pubKey: null, banned: 0 });
-
-export async function getProfile(c, userId) {
-	if (!userId) return emptyProfile();
-	const key = 'chat:user:' + userId;
-	const hit = profileCache.get(key);
-	if (hit && now() - hit.at < PROFILE_TTL) return hit.data;
-	let data = emptyProfile();
-	try {
-		const raw = await c.env.kv.get(key, { type: 'json' });
-		if (raw) data = { ...data, ...raw };
-	} catch {
-		/* KV 未绑定时降级为默认值 */
-	}
-	profileCache.set(key, { at: now(), data });
-	return data;
+function normalizeProfile(row) {
+	if (!row) return emptyProfile();
+	return {
+		avatar: row.avatar || '',
+		qq: row.qq || '',
+		pubKey: row.pub_key || null,
+		keyBackup: row.key_backup || null,
+		keyUpdatedAt: Number(row.key_updated_at) || 0,
+		banned: Number(row.banned) || 0
+	};
 }
 
+/** 批量取，避免会话列表 / 消息列表里逐条查 */
 export async function getProfiles(c, userIds) {
-	const uniq = [...new Set(userIds.filter(Boolean).map(Number))];
-	const out = new Map();
-	await Promise.all(uniq.map(async id => out.set(id, await getProfile(c, id))));
-	return out;
+	const uniq = [...new Set((userIds || []).filter(Boolean).map(Number).filter(n => n > 0))];
+	const map = new Map();
+	if (!uniq.length) return map;
+	const ph = uniq.map(() => '?').join(',');
+	const rows = await db.all(c, `SELECT * FROM chat_profile WHERE user_id IN (${ph})`, ...uniq);
+	const byId = new Map(rows.map(r => [Number(r.user_id), normalizeProfile(r)]));
+	for (const id of uniq) map.set(id, byId.get(id) || emptyProfile());
+	return map;
+}
+
+export async function getProfile(c, userId) {
+	const id = Number(userId);
+	if (!id) return emptyProfile();
+	const map = await getProfiles(c, [id]);
+	return map.get(id) || emptyProfile();
 }
 
 export async function setProfile(c, userId, patch) {
-	const key = 'chat:user:' + userId;
 	const cur = await getProfile(c, userId);
 	const next = { ...cur, ...patch };
-	await c.env.kv.put(key, JSON.stringify(next));
-	profileCache.set(key, { at: now(), data: next });
+	await db.run(c, `INSERT INTO chat_profile
+		(user_id, avatar, qq, pub_key, key_backup, key_updated_at, banned, updated_at)
+		VALUES (?,?,?,?,?,?,?,?)
+		ON CONFLICT(user_id) DO UPDATE SET
+			avatar = excluded.avatar,
+			qq = excluded.qq,
+			pub_key = excluded.pub_key,
+			key_backup = excluded.key_backup,
+			key_updated_at = excluded.key_updated_at,
+			banned = excluded.banned,
+			updated_at = excluded.updated_at`,
+		Number(userId), next.avatar || '', next.qq || '', next.pubKey || null,
+		next.keyBackup || null, next.keyUpdatedAt || 0, next.banned || 0, now());
 	return next;
 }
 
@@ -180,22 +200,27 @@ export function blobExtFor(contentType) {
 	return 'bin'; // 端到端加密后的密文，服务器不知道是什么图
 }
 
-// ---------------------------------------------------------------- 限流（KV 粗粒度）
+// ---------------------------------------------------------------- 限流（D1）
 
 /**
- * Worker 里没有跨 isolate 的内存，用 KV 做粗粒度限流。
- * 计数不准也无所谓——目的是挡住脚本刷屏，不是精确配额。
+ * 高频动作（发消息、建群、举报）直接数业务表，不额外写任何东西；
+ * 低频动作（上传图片/头像）才写 chat_throttle。
  */
-export async function rateLimit(c, key, limit, windowSec) {
-	try {
-		const k = 'chat:rl:' + key;
-		const cur = Number(await c.env.kv.get(k)) || 0;
-		if (cur >= limit) return false;
-		await c.env.kv.put(k, String(cur + 1), { expirationTtl: Math.max(60, windowSec) });
-		return true;
-	} catch {
-		return true; // KV 异常时不阻断业务
+export async function rateLimit(c, bucket, limit, windowSec) {
+	const since = now() - windowSec * 1000;
+	const row = await db.first(c, 'SELECT COUNT(*) AS c FROM chat_throttle WHERE bucket = ? AND ts > ?', bucket, since);
+	if (Number((row && row.c) || 0) >= limit) return false;
+	await db.run(c, 'INSERT INTO chat_throttle (bucket, ts) VALUES (?,?)', bucket, now());
+	if (Math.random() < 0.05) {
+		await db.run(c, 'DELETE FROM chat_throttle WHERE ts < ?', now() - 24 * 3600_000);
 	}
+	return true;
+}
+
+/** 用 COUNT(*) 判断窗口内是否超限，不产生写入 */
+export async function countSince(c, sql, ...args) {
+	const row = await db.first(c, sql, ...args);
+	return Number((row && row.c) || 0);
 }
 
 // ---------------------------------------------------------------- 审计

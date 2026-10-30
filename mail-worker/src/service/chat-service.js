@@ -9,7 +9,7 @@ import BizError from '../error/biz-error';
 import {
 	db, now, uid, shortId, clampStr, oneOf, toInt, sha256Hex,
 	convRow, membership, isMemberOf, guestReadable,
-	hydrateUsers, getProfile, setProfile, audit, rateLimit,
+	hydrateUsers, getProfile, getProfiles, setProfile, audit, rateLimit, countSince,
 	safeParse, previewOf, putBlob, getBlob, mimeOf, blobExtFor, sniffImage, assertR2
 } from './chat-core';
 
@@ -198,11 +198,11 @@ export const chatService = {
 				FROM chat_member mem JOIN user u ON u.user_id = mem.user_id
 				WHERE mem.conv_id = ? AND mem.status IN ('active','pending')
 				ORDER BY mem.joined_at ASC`, conv.id);
-			const profiles = await Promise.all(rows.map(r => getProfile(c, Number(r.user_id))));
-			members = rows.map((r, i) => ({
+			const profiles = await getProfiles(c, rows.map(r => Number(r.user_id)));
+			members = rows.map(r => ({
 				id: String(r.email).toLowerCase(),
 				uid: Number(r.user_id),
-				avatar: profiles[i].avatar || '',
+				avatar: (profiles.get(Number(r.user_id)) || {}).avatar || '',
 				nickname: r.nickname || String(r.email).split('@')[0],
 				role: r.role,
 				status: r.status,
@@ -214,7 +214,10 @@ export const chatService = {
 
 	// ---- 建群
 	async createGroup(c, user, body) {
-		if (!await rateLimit(c, 'cc:' + user.userId, 5, 60)) throw new BizError('创建太频繁，稍后再试', 429);
+		const madeRecently = await countSince(c,
+			'SELECT COUNT(*) AS c FROM chat_conversation WHERE owner_id = ? AND created_at > ?',
+			user.userId, now() - 60_000);
+		if (madeRecently >= 5) throw new BizError('创建太频繁，稍后再试', 429);
 		const name = clampStr(body.name, 24);
 		if (!name) throw new BizError('群名称不能为空', 400);
 		if (oneOf(body.type, ['group', 'dm'], 'group') === 'dm') throw new BizError('请使用私聊接口', 400);
@@ -499,15 +502,15 @@ export const chatService = {
 				WHERE m.conv_id = ? AND m.id < ? AND m.deleted = 0
 				ORDER BY m.id DESC LIMIT ?`, conv.id, before, limit)).reverse();
 
-		const profiles = await Promise.all(rows.map(r => getProfile(c, Number(r.sender_id))));
+		const profiles = await getProfiles(c, rows.map(r => Number(r.sender_id)));
 		return {
 			encMode: conv.enc_mode,
-			messages: rows.map((r, i) => ({
+			messages: rows.map(r => ({
 				id: r.id,
 				senderId: r.sender_id,
 				senderEmail: r.email ? String(r.email).toLowerCase() : '',
 				senderName: r.nickname || (r.email ? String(r.email).split('@')[0] : '用户' + r.sender_id),
-				senderAvatar: profiles[i].avatar || '',
+				senderAvatar: (profiles.get(Number(r.sender_id)) || {}).avatar || '',
 				senderUid: Number(r.sender_id),
 				kind: r.kind,
 				body: safeParse(r.body),
@@ -526,7 +529,10 @@ export const chatService = {
 			throw new BizError('你还不是该群成员', 403);
 		}
 		if (Number(me.muted) === 1) throw new BizError('你已被禁言', 403);
-		if (!await rateLimit(c, 'msg:' + user.userId, 20, 15)) throw new BizError('发送太快了，休息一下', 429);
+		const sentRecently = await countSince(c,
+			'SELECT COUNT(*) AS c FROM chat_message WHERE sender_id = ? AND created_at > ?',
+			user.userId, now() - 15_000);
+		if (sentRecently >= 20) throw new BizError('发送太快了，休息一下', 429);
 
 		const kind = oneOf(body.kind, ['text', 'image'], 'text');
 		const bodyRaw = body.body;
@@ -611,13 +617,13 @@ export const chatService = {
 				(SELECT COUNT(*) FROM chat_group_key g WHERE g.conv_id = mem.conv_id AND g.user_id = mem.user_id) AS has
 			FROM chat_member mem JOIN user u ON u.user_id = mem.user_id
 			WHERE mem.conv_id = ? AND mem.status = 'active'`, conv.id);
-		const profiles = await Promise.all(rows.map(r => getProfile(c, Number(r.user_id))));
-		return rows.map((r, i) => ({
+		const profiles = await getProfiles(c, rows.map(r => Number(r.user_id)));
+		return rows.map(r => ({
 			userId: String(r.email).toLowerCase(),
 			uid: Number(r.user_id),
 			nickname: r.nickname || String(r.email).split('@')[0],
 			hasKey: Number(r.has) > 0,
-			pubKey: profiles[i].pubKey || null
+			pubKey: (profiles.get(Number(r.user_id)) || {}).pubKey || null
 		}));
 	},
 
@@ -641,7 +647,10 @@ export const chatService = {
 		const convId = clampStr(body.convId, 64);
 		const reason = clampStr(body.reason, 300);
 		if (!convId || !reason) throw new BizError('缺少参数', 400);
-		if (!await rateLimit(c, 'rp:' + user.userId, 5, 300)) throw new BizError('举报过于频繁', 429);
+		const reportedRecently = await countSince(c,
+			'SELECT COUNT(*) AS c FROM chat_report WHERE reporter_id = ? AND created_at > ?',
+			user.userId, now() - 300_000);
+		if (reportedRecently >= 5) throw new BizError('举报过于频繁', 429);
 		await db.run(c, 'INSERT INTO chat_report (conv_id, msg_id, reporter_id, reason, created_at) VALUES (?,?,?,?,?)',
 			convId, toInt(body.msgId, 0), user.userId, reason, now());
 		return { reported: true };
@@ -666,15 +675,17 @@ export const chatService = {
 				ORDER BY active_time DESC LIMIT 20`,
 				me.userId, `%${key}%`, `%${key}%`);
 		}
-		const profiles = await Promise.all(rows.map(r => getProfile(c, Number(r.user_id))));
-		return rows
-			.filter((r, i) => Number(profiles[i].banned) !== 1)
-			.map((r, i) => ({
+		const profiles = await getProfiles(c, rows.map(r => Number(r.user_id)));
+		return rows.map(r => {
+			const prof = profiles.get(Number(r.user_id)) || {};
+			return {
 				id: String(r.email).toLowerCase(),
 				uid: Number(r.user_id),
 				nickname: r.nickname || String(r.email).split('@')[0],
-				avatar: profiles[i].avatar || ''
-			}));
+				avatar: prof.avatar || '',
+				banned: Number(prof.banned) === 1
+			};
+		}).filter(u => !u.banned).map(({ banned, ...rest }) => rest);
 	},
 
 	// ---------------------------------------------------------------- 管理后台
@@ -698,14 +709,9 @@ export const chatService = {
 		};
 	},
 
-	/** 封禁数存在 KV，只能抽样统计 */
 	async countBanned(c) {
-		try {
-			const list = await c.env.kv.get('chat:banned:index', { type: 'json' });
-			return Array.isArray(list) ? list.length : 0;
-		} catch {
-			return 0;
-		}
+		const row = await db.first(c, 'SELECT COUNT(*) AS c FROM chat_profile WHERE banned = 1');
+		return Number((row && row.c) || 0);
 	},
 
 	async adminUsers(c, kw) {
@@ -716,18 +722,21 @@ export const chatService = {
 				`%${key}%`, `%${key}%`)
 			: await db.all(c, `SELECT user_id, email, nickname, create_time, active_time FROM user
 				WHERE is_del = 0 ORDER BY active_time DESC LIMIT 100`);
-		const profiles = await Promise.all(rows.map(r => getProfile(c, Number(r.user_id))));
-		return rows.map((r, i) => ({
-			id: String(r.email).toLowerCase(),
-			uid: Number(r.user_id),
-			nickname: r.nickname || String(r.email).split('@')[0],
-			avatar: profiles[i].avatar || '',
-			qq: profiles[i].qq || '',
-			banned: Number(profiles[i].banned) === 1,
-			hasKey: Boolean(profiles[i].pubKey),
-			createdAt: r.create_time,
-			lastSeen: r.active_time
-		}));
+		const profiles = await getProfiles(c, rows.map(r => Number(r.user_id)));
+		return rows.map(r => {
+			const prof = profiles.get(Number(r.user_id)) || {};
+			return {
+				id: String(r.email).toLowerCase(),
+				uid: Number(r.user_id),
+				nickname: r.nickname || String(r.email).split('@')[0],
+				avatar: prof.avatar || '',
+				qq: prof.qq || '',
+				banned: Number(prof.banned) === 1,
+				hasKey: Boolean(prof.pubKey),
+				createdAt: r.create_time,
+				lastSeen: r.active_time
+			};
+		});
 	},
 
 	async adminSetUser(c, adminEmail, targetRaw, body) {
@@ -735,21 +744,9 @@ export const chatService = {
 		const prof = await getProfile(c, target);
 		if (body.banned !== undefined) {
 			await setProfile(c, target, { banned: body.banned ? 1 : 0 });
-			await this.trackBan(c, target, Boolean(body.banned));
 		}
 		await audit(c, 0, 'admin.user.update', String(target), { ...body, by: adminEmail });
 		return { ...prof, ...(body.banned !== undefined ? { banned: body.banned ? 1 : 0 } : {}) };
-	},
-
-	async trackBan(c, userId, banned) {
-		try {
-			const list = await c.env.kv.get('chat:banned:index', { type: 'json' });
-			const set = new Set(Array.isArray(list) ? list : []);
-			if (banned) set.add(Number(userId)); else set.delete(Number(userId));
-			await c.env.kv.put('chat:banned:index', JSON.stringify([...set]));
-		} catch {
-			/* ignore */
-		}
 	},
 
 	async adminGroups(c, kw) {
