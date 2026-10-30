@@ -27,7 +27,7 @@ export async function pickBot(c, conv) {
 export async function notifyTargets(c, conv, senderId) {
 	if (conv.type === 'dm') {
 		const other = await db.first(c,
-			'SELECT user_id FROM chat_member WHERE conv_id = ? AND user_id <> ? LIMIT 1', conv.id, senderId);
+			'SELECT user_id FROM chat_member WHERE conv_id = ? AND user_id <> ? AND muted = 0 LIMIT 1', conv.id, senderId);
 		if (!other) return [];
 		const prof = await getProfile(c, Number(other.user_id));
 		return [{
@@ -38,7 +38,7 @@ export async function notifyTargets(c, conv, senderId) {
 	}
 	const rows = await db.all(c, `SELECT mem.user_id, mem.qq AS member_qq
 		FROM chat_member mem
-		WHERE mem.conv_id = ? AND mem.status = 'active' AND mem.user_id <> ?`, conv.id, senderId);
+		WHERE mem.conv_id = ? AND mem.status = 'active' AND mem.user_id <> ? AND mem.muted = 0`, conv.id, senderId);
 	// 一次批量取个人资料（群内绑定优先，其次全站绑定）
 	const profiles = await getProfiles(c, rows.map(r => Number(r.user_id)));
 	const out = [];
@@ -54,9 +54,17 @@ export async function notifyTargets(c, conv, senderId) {
 
 async function pushQueue(c, bot, conv, msg, payload) {
 	if (payload.kind === 'private') {
-		// 同一个群对同一个人 90 秒内只提醒一次，避免刷屏
+		// 同一条消息对同一个人只入队一次（幂等）
+		const dup = await db.first(c,
+			`SELECT id FROM chat_bot_queue WHERE conv_id = ? AND msg_id = ? AND payload LIKE ?`,
+			conv.id, msg.id, `%"userId":"${payload.userId}"%`);
+		if (dup) return;
+		// 真正送达过的，90 秒内不再打扰，避免刷屏。
+		// 只数 status='done'：发送失败还在退避重试的行并没有提醒到人，
+		// 不能拿它堵后续通知，否则机器人故障期间新消息会被全部吞掉。
 		const recent = await db.first(c,
-			`SELECT id FROM chat_bot_queue WHERE conv_id = ? AND status = 'pending' AND payload LIKE ? AND created_at > ?`,
+			`SELECT id FROM chat_bot_queue
+			 WHERE conv_id = ? AND status = 'done' AND payload LIKE ? AND created_at > ?`,
 			conv.id, `%"userId":"${payload.userId}"%`, now() - 90_000);
 		if (recent) return;
 	}
@@ -120,8 +128,8 @@ export async function dispatchNotify(c, conv, msg, senderName) {
 		});
 	}
 
-	// 2) 私聊提醒：绑定过 QQ 官方机器人（有 openid）的走官方接口，
-	//    其余的按原有 OneBot 队列处理。消息内容一律只带「有新消息」。
+	// 2) 私聊提醒：只告诉「有新消息」，任何情况下都不带正文。
+	//    群 → QQ 群的转发在另一条路径（第 1 段），不受影响。
 	const targets = await notifyTargets(c, conv, msg.senderId);
 	const official = [];
 	for (const t of targets) {
@@ -133,7 +141,7 @@ export async function dispatchNotify(c, conv, msg, senderName) {
 		} else if (t.qq && bot) {
 			await pushQueue(c, bot, conv, msg, {
 				kind: 'private', userId: t.qq, toUser: t.userId,
-				text: conv.type === 'dm' ? body : `${body}：${text.slice(0, 200)}`
+				text: body
 			});
 		}
 	}

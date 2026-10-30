@@ -311,6 +311,28 @@ const png = Buffer.from(
 	const qrow = (r.data?.data || [])[0];
 	check('提醒进入队列', Boolean(qrow), r.data?.data);
 	check('提醒里带 QQ 号', qrow && qrow.payload?.userId === '1234567', qrow && qrow.payload);
+	check('私聊提醒不带正文', qrow && !String(qrow.payload?.text || '').includes('触发一次提醒'), qrow && qrow.payload?.text);
+
+	console.log('== 免打扰 ==');
+	r = await api(`/chat/conversations/${gid}/mute`, { token: B, method: 'POST', body: { muted: true } });
+	check('开启免打扰', r.data?.data?.muted === true, r.data);
+	r = await api('/chat/conversations', { token: B });
+	const gMuted = (r.data?.data || []).find(c => c.id === gid);
+	check('摘要里带 muted 标记', gMuted && gMuted.muted === true, gMuted?.muted);
+	r = await api(`/chat/conversations/${gid}/messages`, { token: A, method: 'POST', body: { kind: 'text', body: { text: '免打扰期间的内容' } } });
+	const mutedMsgId = r.data?.data?.id;
+	await new Promise(res => setTimeout(res, 1200));
+	r = await api(`/chat/admin/bot-queue?convId=${gid}`, { token: ADM });
+	check('免打扰后不再进提醒队列', (r.data?.data || []).every(x => !(x.msgId === mutedMsgId && x.payload?.userId === '1234567')), mutedMsgId);
+	r = await api(`/chat/conversations/${gid}/mute`, { token: B, method: 'POST', body: { muted: false } });
+	check('关闭免打扰', r.data?.data?.muted === false, r.data);
+	r = await api(`/chat/conversations/${gid}/messages`, { token: A, method: 'POST', body: { kind: 'text', body: { text: '解除后能收到' } } });
+	const unmutedMsgId = r.data?.data?.id;
+	await new Promise(res => setTimeout(res, 1200));
+	r = await api(`/chat/admin/bot-queue?convId=${gid}`, { token: ADM });
+	check('解除免打扰后恢复提醒', (r.data?.data || []).some(x => x.msgId === unmutedMsgId && x.payload?.userId === '1234567'), unmutedMsgId);
+	r = await api(`/chat/conversations/${gid}/mute`, { method: 'POST', body: { muted: true } });
+	check('游客不能设置免打扰', r.status === 401, r.status);
 
 	console.log('== 举报 ==');
 	r = await api('/chat/reports', { token: B, method: 'POST', body: { convId: gid, msgId: m1, reason: '测试举报' } });

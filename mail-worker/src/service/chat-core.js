@@ -64,6 +64,12 @@ export async function ensureSchema(c) {
 		}
 	}
 
+	// 免打扰是后来加的字段，老库没有
+	const memberCols = (await c.env.db.prepare('PRAGMA table_info(chat_member)').all()).results.map(r => r.name);
+	if (!memberCols.includes('muted')) {
+		await c.env.db.prepare('ALTER TABLE chat_member ADD COLUMN muted INTEGER NOT NULL DEFAULT 0').run();
+	}
+
 	// 一次性迁移：端到端加密已下线，历史会话统一转明文。
 	// 旧密文本身解不开了，但新消息可以正常收发。
 	const flag = await c.env.db.prepare("SELECT v FROM chat_setting WHERE k = 'migrated_plain'").first();

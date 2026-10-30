@@ -430,14 +430,12 @@ app.post('/chat/conversations/:id/messages', route(async c => {
 	tasks.push(dispatchNotify(c, conv, msg, msg.senderName));
 	tasks.push((async () => {
 		const targets = await db.all(c, `SELECT user_id FROM chat_member
-			WHERE conv_id = ? AND status = 'active' AND user_id <> ?`, conv.id, user.userId);
+			WHERE conv_id = ? AND status = 'active' AND user_id <> ? AND muted = 0`, conv.id, user.userId);
 		const ids = targets.map(t => Number(t.user_id));
 		if (!ids.length) return;
-		const isE2EE = conv.enc_mode === 'e2ee';
+		// 锁屏可见的通知一律不带正文，只说「有新消息」
 		const title = conv.type === 'dm' ? `💬 ${msg.senderName}` : `💬 ${conv.name || '聊天组'}`;
-		const body = isE2EE
-			? (conv.type === 'dm' ? '给你发了一条加密消息' : `${msg.senderName} 发了新消息（加密）`)
-			: `${msg.senderName}：${msg.body && msg.body.text ? String(msg.body.text).slice(0, 120) : ''}`;
+		const body = conv.type === 'dm' ? '给你发了一条消息' : `${msg.senderName} 发了新消息`;
 		await pushToUsers(c, ids, { title, body, url: '/chat/?conv=' + encodeURIComponent(conv.id) });
 	})());
 	if (c.executionCtx && c.executionCtx.waitUntil) {
@@ -447,6 +445,20 @@ app.post('/chat/conversations/:id/messages', route(async c => {
 	}
 
 	return msg;
+}));
+
+app.post('/chat/conversations/:id/mute', route(async c => {
+	const user = requireUser(c);
+	const convId = c.req.param('id');
+	const me = await db.first(c,
+		'SELECT * FROM chat_member WHERE conv_id = ? AND user_id = ?', convId, user.userId);
+	if (!me || me.status !== 'active') throw new BizError('只有成员才能设置免打扰', 403);
+	const body = await json(c);
+	const muted = body.muted ? 1 : 0;
+	await db.run(c,
+		'UPDATE chat_member SET muted = ? WHERE conv_id = ? AND user_id = ?', muted, convId, user.userId);
+	await audit(c, user.userId, 'conv.mute', convId, { muted });
+	return { muted: Boolean(muted) };
 }));
 
 app.post('/chat/conversations/:id/read', route(async c => {

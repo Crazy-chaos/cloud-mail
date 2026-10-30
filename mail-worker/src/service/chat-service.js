@@ -130,6 +130,7 @@ async function buildSummaries(c, convs, viewerId) {
 				? (pendingMap.get(conv.id) || 0) : 0,
 			myRole: m ? m.role : null,
 			myStatus: m ? m.status : null,
+			muted: m ? Number(m.muted) === 1 : false,
 			unread: viewerId ? (unreadMap.get(conv.id) || 0) : 0,
 			peer: conv.type === 'dm' ? peer : null,
 			lastMessage: last ? {
