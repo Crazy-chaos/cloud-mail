@@ -267,7 +267,7 @@ app.post('/chat/push/test', route(async c => {
 	const user = requireUser(c);
 	const subs = await db.all(c, 'SELECT * FROM chat_push_sub WHERE user_id = ?', user.userId);
 	if (!subs.length) throw new BizError('还没有订阅，请先开启通知', 400);
-	let ok = 0;
+	const results = [];
 	for (const sb of subs) {
 		const r = await sendPush(c, sb, {
 			title: '聊天组测试通知',
@@ -275,9 +275,14 @@ app.post('/chat/push/test', route(async c => {
 			url: '/chat/'
 		});
 		if (r.gone) await db.run(c, 'DELETE FROM chat_push_sub WHERE endpoint = ?', sb.endpoint);
-		if (r.ok) ok++;
+		results.push({
+			endpoint: String(sb.endpoint).slice(0, 48),
+			ok: Boolean(r.ok),
+			status: r.status || 0,
+			detail: r.detail || r.message || ''
+		});
 	}
-	return { sent: subs.length, ok };
+	return { sent: subs.length, ok: results.filter(r => r.ok).length, results };
 }));
 
 // ---------------------------------------------------------------- 会话

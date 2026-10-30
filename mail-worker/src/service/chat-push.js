@@ -42,8 +42,12 @@ const concat = (...arrays) => {
 
 async function hkdf(ikm, salt, info, len) {
 	const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+	// info 可能是字符串（"Content-Encoding: aes128gcm\0"）也可能是字节串
+	// （"WebPush: info\0" || ua_public || as_public）。TextEncoder 只接受字符串，
+	// 直接丢 Uint8Array 进去会被转成 "1,2,3" 这种文本，密钥就全错了。
+	const infoBytes = typeof info === 'string' ? te.encode(info) : info;
 	const bits = await crypto.subtle.deriveBits(
-		{ name: 'HKDF', hash: 'SHA-256', salt, info: te.encode(info) }, key, len * 8);
+		{ name: 'HKDF', hash: 'SHA-256', salt, info: infoBytes }, key, len * 8);
 	return new Uint8Array(bits);
 }
 
@@ -170,8 +174,15 @@ export async function sendPush(c, sub, payload) {
 			body,
 			signal: AbortSignal.timeout(8000)
 		});
-		return { ok: res.ok, status: res.status, gone: res.status === 404 || res.status === 410 };
+		if (!res.ok) {
+			const detail = await res.text().catch(() => '');
+			// 常见：403 表示 VAPID 公钥与订阅时的那个不一致（换过密钥要重新订阅）
+			console.warn('[push]', res.status, String(sub.endpoint).slice(0, 50), detail.slice(0, 160));
+			return { ok: false, status: res.status, detail: detail.slice(0, 160), gone: res.status === 404 || res.status === 410 };
+		}
+		return { ok: true, status: res.status, gone: false };
 	} catch (e) {
+		console.warn('[push] fetch failed', e.message);
 		return { ok: false, message: e.message, gone: false };
 	}
 }
