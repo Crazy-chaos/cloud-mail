@@ -13,7 +13,7 @@ import { dispatchNotify, inboundFromQQ, callOneBot, pumpBots } from '../service/
 import { pushToUsers, loadVapid, sendPush } from '../service/chat-push';
 import {
 	qqConfig, getAccessToken, sendQQPrivate, verifyCallback, signPlainToken,
-	setBindCode, bindByCode, unbind, resetTokenCache
+	setBindCode, bindByCode, unbind, resetTokenCache, selfCheckSign
 } from '../service/chat-qq';
 import {
 	currentUser, requireUser, isSiteAdmin, clampStr, toInt, now, uid, sha256Hex,
@@ -523,13 +523,22 @@ app.post('/chat/admin/qq', route(async c => {
 
 app.post('/chat/admin/qq/test', route(async c => {
 	adminOnly(c);
+	const signed = await selfCheckSign(c);
 	const token = await getAccessToken(c);
 	const res = await fetch('https://api.sgroup.qq.com/users/@me', {
 		headers: { Authorization: `QQBot ${token}` },
 		signal: AbortSignal.timeout(8000)
 	});
 	const data = await res.json().catch(() => ({}));
-	return { ok: res.ok, name: data.username || '', id: data.id || '' };
+	return {
+		ok: res.ok,
+		name: data.username || '',
+		id: data.id || '',
+		// 回调验证能否通过，取决于 BotSecret 是否配好且签名链正确
+		callbackReady: Boolean(signed.ok),
+		secretLen: signed.secretLen || 0,
+		secretReason: signed.reason || ''
+	};
 }));
 
 /**

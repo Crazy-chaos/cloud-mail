@@ -113,11 +113,27 @@ export async function verifyCallback(c, signature, timestamp, rawBody) {
 /** 回调地址验证（op=13）：用同一把种子对 ts + plain_token 签名 */
 export async function signPlainToken(c, plainToken, eventTs) {
 	const cfg = await qqConfig(c);
-	if (!cfg.botSecret) throw new Error('未配置 BotSecret，无法完成回调验证');
+	if (!cfg.botSecret) throw new Error('未配置 BotSecret：开放平台 → 开发 → 开发设置 → 机器人密钥');
 	const key = await seedKey(cfg.botSecret, ['sign']);
 	const sig = await crypto.subtle.sign(
 		{ name: 'Ed25519' }, key, te.encode(String(eventTs) + String(plainToken)));
 	return bytesToHex(new Uint8Array(sig));
+}
+
+/** 签名自检：对固定字符串签名并立即验签，用来确认 BotSecret 可用 */
+export async function selfCheckSign(c) {
+	const cfg = await qqConfig(c);
+	if (!cfg.botSecret) return { ok: false, reason: '未配置 BotSecret' };
+	try {
+		const signer = await seedKey(cfg.botSecret, ['sign']);
+		const verifier = await seedKey(cfg.botSecret, ['verify']);
+		const msg = te.encode('1710000000' + 'selftest');
+		const sig = await crypto.subtle.sign({ name: 'Ed25519' }, signer, msg);
+		const ok = await crypto.subtle.verify({ name: 'Ed25519' }, verifier, sig, msg);
+		return { ok, secretLen: cfg.botSecret.length };
+	} catch (e) {
+		return { ok: false, reason: e.message };
+	}
 }
 
 // ---------------------------------------------------------------- 绑定
