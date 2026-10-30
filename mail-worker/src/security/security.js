@@ -130,6 +130,29 @@ app.use('*', async (c, next) => {
 		return await next();
 	}
 
+	// 聊天组：游客也能浏览公开群，所以这里做「可选鉴权」——
+	// 有有效 token/cookie 就把 user 放进上下文，没有也放行，由业务层判断权限。
+	if (path === '/chat' || path.startsWith('/chat/')) {
+		const headerToken = c.req.header(constant.TOKEN_HEADER);
+		const jwt = (headerToken && headerToken !== 'null' && headerToken !== 'undefined')
+			? headerToken
+			: getCookie(c, constant.TOKEN_COOKIE);
+		if (jwt) {
+			try {
+				const result = await jwtUtils.verifyToken(c, jwt);
+				if (result) {
+					const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + result.userId, { type: 'json' });
+					if (authInfo && authInfo.tokens.includes(result.token)) {
+						c.set('user', authInfo.user);
+					}
+				}
+			} catch (e) {
+				// 无效凭据按游客处理，不阻断浏览
+			}
+		}
+		return await next();
+	}
+
 
 	const headerToken = c.req.header(constant.TOKEN_HEADER);
 	const jwt = (headerToken && headerToken !== 'null' && headerToken !== 'undefined')

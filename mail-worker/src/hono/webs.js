@@ -22,4 +22,5 @@ import '../api/telegram-api'
 import '../api/oauth-api'
 import '../api/blog-api'
 import '../api/tool-api'
+import '../api/chat-api'
 export default app;

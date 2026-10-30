@@ -6,6 +6,7 @@ import emailService from './service/email-service';
 import kvObjService from './service/kv-obj-service';
 import oauthService from "./service/oauth-service";
 import analysisService from './service/analysis-service';
+import { pumpOnCron } from './api/chat-api';
 export default {
 	 async fetch(req, env, ctx) {
 
@@ -25,6 +26,9 @@ export default {
 	},
 	email: email,
 	async scheduled(c, env, ctx) {
+		// 聊天组：把 QQ 机器人队列里到点的消息推出去（失败重试的兜底）
+		await pumpOnCron(env);
+
 		if (c.cron === '*/30 * * * *') {
 			await analysisService.refreshEchartsCache({ env })
 			return;
