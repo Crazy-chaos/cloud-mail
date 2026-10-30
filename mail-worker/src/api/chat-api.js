@@ -9,7 +9,7 @@
 import app from '../hono/hono';
 import BizError from '../error/biz-error';
 import chatService from '../service/chat-service';
-import { dispatchNotify, inboundFromQQ, callOneBot, pumpBots } from '../service/chat-bot';
+import { dispatchNotify, inboundFromQQ, callOneBot, pumpBots, pickBot } from '../service/chat-bot';
 import { pushToUsers, loadVapid, sendPush } from '../service/chat-push';
 import {
 	qqConfig, getAccessToken, sendQQPrivate, verifyCallback, signPlainToken,
@@ -481,6 +481,24 @@ app.post('/chat/reports', route(async c => {
 // ---------------------------------------------------------------- QQ 官方机器人
 
 /** 生成 6 位绑定码：用户在 QQ 里私聊机器人发送这个码即可完成绑定 */
+app.post('/chat/me/qq/test', route(async c => {
+	const user = requireUser(c);
+	const prof = await getProfile(c, user.userId);
+	const qq = String(prof.qq || '').trim();
+	if (!qq) throw new BizError('还没填 QQ 号', 400);
+
+	const bot = await pickBot(c, { notify_bot_id: '', id: '' });
+	if (!bot) return { sent: false, reason: '管理员还没有配置机器人' };
+	if (!bot.endpoint) return { sent: false, reason: '机器人没有填接口地址' };
+
+	const r = await callOneBot(bot, {
+		kind: 'private',
+		userId: qq,
+		text: '【测试】塔菲聊天组的 QQ 提醒已经接通，群里有新消息会在这里通知你。'
+	});
+	return { sent: Boolean(r && r.ok), reason: r && r.ok ? '' : (r && (r.message || r.body) || '发送失败') };
+}));
+
 app.post('/chat/me/qq/bind-code', route(async c => {
 	const user = requireUser(c);
 	const code = await setBindCode(c, user.userId);
