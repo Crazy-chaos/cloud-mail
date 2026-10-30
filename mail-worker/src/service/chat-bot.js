@@ -6,6 +6,7 @@
  */
 
 import { db, now, safeParse, convRow, getProfile, getProfiles } from './chat-core';
+import { sendQQPrivate } from './chat-qq';
 
 export async function pickBot(c, conv) {
 	if (conv.notify_bot_id) {
@@ -29,22 +30,24 @@ export async function notifyTargets(c, conv, senderId) {
 			'SELECT user_id FROM chat_member WHERE conv_id = ? AND user_id <> ? LIMIT 1', conv.id, senderId);
 		if (!other) return [];
 		const prof = await getProfile(c, Number(other.user_id));
-		const qq = prof.qq ? String(prof.qq).trim() : '';
-		return qq ? [{ userId: Number(other.user_id), qq }] : [];
+		return [{
+			userId: Number(other.user_id),
+			qq: prof.qq ? String(prof.qq).trim() : '',
+			openid: prof.qqOpenid || ''
+		}];
 	}
 	const rows = await db.all(c, `SELECT mem.user_id, mem.qq AS member_qq
 		FROM chat_member mem
 		WHERE mem.conv_id = ? AND mem.status = 'active' AND mem.user_id <> ?`, conv.id, senderId);
-	// 一次批量取个人 QQ（群内绑定优先，其次全站绑定）
+	// 一次批量取个人资料（群内绑定优先，其次全站绑定）
 	const profiles = await getProfiles(c, rows.map(r => Number(r.user_id)));
 	const out = [];
 	for (const r of rows) {
+		const prof = profiles.get(Number(r.user_id)) || {};
 		let qq = (r.member_qq || '').trim();
-		if (!qq) {
-			const prof = profiles.get(Number(r.user_id)) || {};
-			qq = prof.qq ? String(prof.qq).trim() : '';
-		}
-		if (qq) out.push({ userId: Number(r.user_id), qq });
+		if (!qq && prof.qq) qq = String(prof.qq).trim();
+		const openid = prof.qqOpenid || '';
+		if (qq || openid) out.push({ userId: Number(r.user_id), qq, openid });
 	}
 	return out;
 }
@@ -117,15 +120,27 @@ export async function dispatchNotify(c, conv, msg, senderName) {
 		});
 	}
 
-	// 2) 私聊提醒：只说「有新消息」，加密内容永不出服务器
+	// 2) 私聊提醒：绑定过 QQ 官方机器人（有 openid）的走官方接口，
+	//    其余的按原有 OneBot 队列处理。消息内容一律只带「有新消息」。
 	const targets = await notifyTargets(c, conv, msg.senderId);
+	const official = [];
 	for (const t of targets) {
-		const body = conv.enc_mode === 'e2ee'
-			? (conv.type === 'dm'
-				? `【私信】${senderName} 给你发了一条加密消息`
-				: `【${convName}】${senderName} 发了新消息（端到端加密，内容仅群内可见）`)
-			: `【${convName}】${senderName}：${text.slice(0, 200)}`;
-		await pushQueue(c, bot, conv, msg, { kind: 'private', userId: t.qq, toUser: t.userId, text: body });
+		const body = conv.type === 'dm'
+			? `【私信】${senderName} 给你发了一条消息`
+			: `【${convName}】${senderName} 发了新消息`;
+		if (t.openid) {
+			official.push({ openid: t.openid, text: body });
+		} else if (t.qq && bot) {
+			await pushQueue(c, bot, conv, msg, {
+				kind: 'private', userId: t.qq, toUser: t.userId,
+				text: conv.type === 'dm' ? body : `${body}：${text.slice(0, 200)}`
+			});
+		}
+	}
+
+	for (const o of official) {
+		// 主动消息：要求用户没关「允许主动发送」，失败只记日志不重试
+		sendQQPrivate(c, o.openid, o.text).catch(e => console.warn('[qq] notify', e.message));
 	}
 
 	await pumpBots(c);

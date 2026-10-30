@@ -52,6 +52,18 @@ export async function ensureSchema(c) {
 	if (schemaReady) return;
 	await c.env.db.batch(DDL.map(sql => c.env.db.prepare(sql)));
 
+	// 老库补列（CREATE TABLE IF NOT EXISTS 不会给已存在的表加字段）
+	const profileCols = (await c.env.db.prepare('PRAGMA table_info(chat_profile)').all()).results.map(r => r.name);
+	for (const [col, ddl] of [
+		['qq_openid', "qq_openid TEXT NOT NULL DEFAULT ''"],
+		['qq_bind_code', "qq_bind_code TEXT NOT NULL DEFAULT ''"],
+		['qq_bind_at', 'qq_bind_at INTEGER NOT NULL DEFAULT 0']
+	]) {
+		if (!profileCols.includes(col)) {
+			await c.env.db.prepare(`ALTER TABLE chat_profile ADD COLUMN ${ddl}`).run();
+		}
+	}
+
 	// 一次性迁移：端到端加密已下线，历史会话统一转明文。
 	// 旧密文本身解不开了，但新消息可以正常收发。
 	const flag = await c.env.db.prepare("SELECT v FROM chat_setting WHERE k = 'migrated_plain'").first();
@@ -101,13 +113,17 @@ export const uidOf = user => (user ? Number(user.userId) : null);
  * 免费版 KV 每天只有 1000 次写入，而这些字段会随每次改头像、每次发提醒被写。
  * 放 D1 后可以一条 SQL 批量取，且不占 KV 额度。
  */
-const emptyProfile = () => ({ avatar: '', qq: '', pubKey: null, keyBackup: null, keyUpdatedAt: 0, banned: 0 });
+const emptyProfile = () => ({
+	avatar: '', qq: '', qqOpenid: '',
+	pubKey: null, keyBackup: null, keyUpdatedAt: 0, banned: 0
+});
 
 function normalizeProfile(row) {
 	if (!row) return emptyProfile();
 	return {
 		avatar: row.avatar || '',
 		qq: row.qq || '',
+		qqOpenid: row.qq_openid || '',
 		pubKey: row.pub_key || null,
 		keyBackup: row.key_backup || null,
 		keyUpdatedAt: Number(row.key_updated_at) || 0,
@@ -138,18 +154,20 @@ export async function setProfile(c, userId, patch) {
 	const cur = await getProfile(c, userId);
 	const next = { ...cur, ...patch };
 	await db.run(c, `INSERT INTO chat_profile
-		(user_id, avatar, qq, pub_key, key_backup, key_updated_at, banned, updated_at)
-		VALUES (?,?,?,?,?,?,?,?)
+		(user_id, avatar, qq, qq_openid, pub_key, key_backup, key_updated_at, banned, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			avatar = excluded.avatar,
 			qq = excluded.qq,
+			qq_openid = excluded.qq_openid,
 			pub_key = excluded.pub_key,
 			key_backup = excluded.key_backup,
 			key_updated_at = excluded.key_updated_at,
 			banned = excluded.banned,
 			updated_at = excluded.updated_at`,
-		Number(userId), next.avatar || '', next.qq || '', next.pubKey || null,
-		next.keyBackup || null, next.keyUpdatedAt || 0, next.banned || 0, now());
+		Number(userId), next.avatar || '', next.qq || '', next.qqOpenid || '',
+		next.pubKey || null, next.keyBackup || null,
+		next.keyUpdatedAt || 0, next.banned || 0, now());
 	return next;
 }
 

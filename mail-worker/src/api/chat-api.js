@@ -12,6 +12,10 @@ import chatService from '../service/chat-service';
 import { dispatchNotify, inboundFromQQ, callOneBot, pumpBots } from '../service/chat-bot';
 import { pushToUsers, loadVapid, sendPush } from '../service/chat-push';
 import {
+	qqConfig, getAccessToken, sendQQPrivate, verifyCallback, signPlainToken,
+	setBindCode, bindByCode, unbind, resetTokenCache
+} from '../service/chat-qq';
+import {
 	currentUser, requireUser, isSiteAdmin, clampStr, toInt, now, uid, sha256Hex,
 	ensureSchema, convRow, getProfile, setProfile, audit, rateLimit,
 	putBlob, getBlob, mimeOf, sniffImage, blobExtFor, assertR2, db
@@ -77,7 +81,8 @@ app.get('/chat/me', route(async c => {
 		},
 		isAdmin: isSiteAdmin(c, user),
 		hasKey: Boolean(prof.pubKey),
-		hasBackup: Boolean(prof.keyBackup)
+		hasBackup: Boolean(prof.keyBackup),
+		qqBound: Boolean(prof.qqOpenid)
 	};
 }));
 
@@ -472,6 +477,126 @@ app.post('/chat/reports', route(async c => {
 	const user = requireUser(c);
 	return await chatService.report(c, user, await json(c));
 }));
+
+// ---------------------------------------------------------------- QQ 官方机器人
+
+/** 生成 6 位绑定码：用户在 QQ 里私聊机器人发送这个码即可完成绑定 */
+app.post('/chat/me/qq/bind-code', route(async c => {
+	const user = requireUser(c);
+	const code = await setBindCode(c, user.userId);
+	const cfg = await qqConfig(c);
+	return { code, botUin: cfg.botUin || '', expireIn: 900 };
+}));
+
+app.delete('/chat/me/qq/bind', route(async c => {
+	const user = requireUser(c);
+	await unbind(c, user.userId);
+	return { unbound: true };
+}));
+
+app.get('/chat/admin/qq', route(async c => {
+	adminOnly(c);
+	const cfg = await qqConfig(c);
+	return {
+		appId: cfg.appId,
+		botUin: cfg.botUin,
+		hasSecret: Boolean(cfg.appSecret),
+		hasBotSecret: Boolean(cfg.botSecret)
+	};
+}));
+
+app.post('/chat/admin/qq', route(async c => {
+	adminOnly(c);
+	const body = await json(c);
+	const pairs = [];
+	if (body.appId !== undefined) pairs.push(['qq_app_id', clampStr(body.appId, 40)]);
+	if (body.appSecret) pairs.push(['qq_app_secret', clampStr(body.appSecret, 120)]);
+	if (body.botSecret) pairs.push(['qq_bot_secret', clampStr(body.botSecret, 120)]);
+	if (body.botUin !== undefined) pairs.push(['qq_bot_uin', clampStr(body.botUin, 20)]);
+	for (const [k, v] of pairs) {
+		await db.run(c,
+			'INSERT INTO chat_setting (k, v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v', k, v);
+	}
+	resetTokenCache();
+	return { saved: true };
+}));
+
+app.post('/chat/admin/qq/test', route(async c => {
+	adminOnly(c);
+	const token = await getAccessToken(c);
+	const res = await fetch('https://api.sgroup.qq.com/users/@me', {
+		headers: { Authorization: `QQBot ${token}` },
+		signal: AbortSignal.timeout(8000)
+	});
+	const data = await res.json().catch(() => ({}));
+	return { ok: res.ok, name: data.username || '', id: data.id || '' };
+}));
+
+/**
+ * QQ 开放平台回调。
+ * 不走登录鉴权：靠 Ed25519 签名（BotSecret）校验来源。
+ * 需要在开放平台把回调地址填成 /api/chat/qq/webhook 并订阅 C2C 事件。
+ */
+app.post('/chat/qq/webhook', async c => {
+	const raw = await c.req.text();
+	const signature = c.req.header('x-signature-ed25519');
+	const timestamp = c.req.header('x-signature-timestamp');
+
+	try {
+		await ensureSchema(c);
+	} catch (e) {
+		return c.json({ code: 500, message: 'db not ready' }, 500);
+	}
+
+	const verdict = await verifyCallback(c, signature, timestamp, raw);
+	if (!verdict.ok) {
+		console.warn('[qq] 签名校验失败', verdict.reason || '');
+		return c.json({ code: 401, message: 'invalid signature' }, 401);
+	}
+
+	let payload = {};
+	try { payload = JSON.parse(raw); } catch { return c.json({ code: 400 }, 400); }
+
+	// 回调地址验证
+	if (payload.op === 13) {
+		try {
+			const signature2 = await signPlainToken(c, payload.d.plain_token, payload.d.event_ts);
+			return c.json({ plain_token: payload.d.plain_token, signature: signature2 });
+		} catch (e) {
+			return c.json({ code: 500, message: e.message }, 500);
+		}
+	}
+
+	// 用户打开了「允许主动发送」
+	if (payload.t === 'C2C_MSG_RECEIVE') {
+		return c.json({ code: 0 });
+	}
+
+	// 用户私聊机器人
+	if (payload.t === 'C2C_MESSAGE_CREATE') {
+		const d = payload.d || {};
+		const openid = (d.author && (d.author.user_openid || d.author.id)) || '';
+		const content = String(d.content || '').trim();
+		const msgId = d.id;
+		if (!openid) return c.json({ code: 0 });
+
+		const m = content.match(/(\d{6})/);
+		if (m) {
+			const bound = await bindByCode(c, openid, m[1]);
+			await sendQQPrivate(c, openid,
+				bound
+					? '绑定成功 ✅ 群里有新消息会在这里提醒你。'
+					: '绑定码无效或已过期，回聊天页左下角 🔔 重新生成。',
+				msgId);
+		} else {
+			await sendQQPrivate(c, openid,
+				'发送 6 位绑定码即可绑定。绑定码在聊天页左下角 🔔 里生成。', msgId);
+		}
+		return c.json({ code: 0 });
+	}
+
+	return c.json({ code: 0 });
+});
 
 // ---------------------------------------------------------------- 机器人
 
