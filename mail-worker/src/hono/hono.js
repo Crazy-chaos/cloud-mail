@@ -9,6 +9,13 @@ const allowedOrigins = new Set([
 	'https://crazychaos.top',
 	'https://game.crazychaos.top',
 	'https://newapp.crazychaos.top',
+	// 桌面 / 手机壳（Tauri、Capacitor）的本地 origin。
+	// 壳里页面从本地加载，后端仍在这台 Worker 上，属于跨域请求。
+	'tauri://localhost',
+	'http://tauri.localhost',
+	'https://tauri.localhost',
+	'capacitor://localhost',
+	'https://localhost',
 	'http://localhost:5555',
 	'http://127.0.0.1:5555',
 	'http://localhost:5173',
