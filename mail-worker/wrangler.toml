@@ -30,6 +30,15 @@ run_worker_first = true
 
 [triggers]
 crons = ["*/30 * * * *", "0 16 * * *"]
+	#每小时执行；resetDaySendCount 仅在 UTC 0 点生效
+
+[[durable_objects.bindings]]
+name = "ws"
+class_name = "MailHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MailHub"]
 
 [vars]
 # Do not commit production values here.
