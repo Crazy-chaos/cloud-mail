@@ -7,6 +7,7 @@ import email from '../entity/email';
 import { isDel } from '../const/entity-const';
 import attService from "./att-service";
 import { t } from '../i18n/i18n'
+import proxyService from './proxy-service';
 const starService = {
 
 	async add(c, params, userId) {
@@ -64,14 +65,21 @@ const starService = {
 			.limit(size)
 			.all();
 
-		const emailIds = list.map(item => item.emailId);
-
-		const attsList = await attService.selectByEmailIds(c, emailIds);
-
-		list.forEach(emailRow => {
-			const atts = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);
-			emailRow.attList = atts;
-		});
+		if (full) {
+			const emailIds = list.map(item => item.emailId);
+			const attsList = await attService.selectByEmailIds(c, emailIds);
+			list.forEach(emailRow => {
+				emailRow.attList = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);
+			});
+			// 星标完整查询同样走图片代理改写。
+			await proxyService.rewriteList(c, list);
+		} else {
+			list.forEach(emailRow => {
+				emailRow.listText = emailService.toListText(emailRow);
+				delete emailRow.text;
+				delete emailRow.content;
+			});
+		}
 
 		return { list };
 	},

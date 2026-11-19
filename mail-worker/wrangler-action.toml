@@ -34,6 +34,14 @@ run_worker_first = true
 [triggers]
 crons = ["*/30 * * * *", "0 16 * * *"]
 
+[[durable_objects.bindings]]
+name = "ws"
+class_name = "MailHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MailHub"]
+
 
 [vars]
 ai_model = "${AI_MODEL}"

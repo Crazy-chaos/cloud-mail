@@ -22,6 +22,10 @@
             <img src="https://img.shields.io/github/forks/maillab/cloud-mail" alt="forks" />
         </a>
     </p>
+    <p align="center" >
+        <a href="https://skymail.ink">在线演示</a> · <a href="https://docs.skymail.ink">部署文档</a> ·
+        <a align="center"><a href="README-en.md">English</a> | 简体中文 | <a href="README-ja.md">日本語</a></a>
+    </p>
     <p align="center">
         <a href="https://trendshift.io/repositories/20459" target="_blank" >
             <img src="https://trendshift.io/api/badge/repositories/20459" alt="trendshift" >

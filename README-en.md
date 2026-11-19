@@ -21,6 +21,8 @@
         <a href="https://github.com/maillab/cloud-mail/forks" target="_blank" >
             <img src="https://img.shields.io/github/forks/maillab/cloud-mail" alt="forks" />
         </a>
+        <a href="https://skymail.ink">Live Demo</a> · <a href="https://docs.skymail.ink/en/">Deployment Guide</a> ·
+        <a href="/README.md">简体中文</a> | English | <a href="/README-ja.md">日本語</a>
     </p>
     <p align="center">
         <a href="https://trendshift.io/repositories/20459" target="_blank" >

@@ -18,6 +18,9 @@ import { t } from '../i18n/i18n'
 import reqUtils from '../utils/req-utils';
 import {oauth} from "../entity/oauth";
 import oauthService from "./oauth-service";
+import settingService from './setting-service';
+import starService from './star-service';
+import userContext from '../security/user-context';
 
 const userService = {
 
@@ -64,6 +67,19 @@ const userService = {
 		}
 		const { salt, hash } = await cryptoUtils.hashPassword(password);
 		await orm(c).update(user).set({ password: hash, salt: salt }).where(eq(user.userId, userId)).run();
+
+		// 个人设置改密：会话列表只留当前 uuid，其它设备下线。管理员改别人密码不走这里。
+		if (userContext.getUserId(c) !== userId) {
+			return;
+		}
+
+		const sessionToken = await userContext.getToken(c);
+		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+		if (!authInfo) {
+			return;
+		}
+		authInfo.tokens = sessionToken ? [sessionToken] : [];
+		await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 	},
 
 	async updateNickname(c, params, userId) {
